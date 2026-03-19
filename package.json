@@ -1,0 +1,34 @@
+{
+  "name": "claude-chat-namer",
+  "version": "1.0.0",
+  "description": "Claude Code plugin: name, search, and resume your conversations. No more UUID chaos.",
+  "main": "scripts/index.js",
+  "bin": {
+    "claude-chat-namer": "./scripts/cli.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "plugin",
+    "chat",
+    "conversations",
+    "organizer",
+    "naming",
+    "resume",
+    "cli"
+  ],
+  "author": "alexd",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    ".claude-plugin/",
+    "scripts/",
+    "skills/",
+    "hooks/",
+    "README.md",
+    "LICENSE"
+  ]
+}
