@@ -4,7 +4,7 @@
   "description": "Claude Code plugin: name, search, and resume your conversations. No more UUID chaos.",
   "main": "scripts/index.js",
   "bin": {
-    "claude-chat-namer": "./scripts/cli.js"
+    "claude-chat-namer": "scripts/cli.js"
   },
   "keywords": [
     "claude",
