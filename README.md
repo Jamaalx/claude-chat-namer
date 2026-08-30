@@ -1,12 +1,34 @@
 # claude-chat-namer
 
+[![CI](https://github.com/Jamaalx/claude-chat-namer/actions/workflows/ci.yml/badge.svg)](https://github.com/Jamaalx/claude-chat-namer/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/claude-chat-namer)](https://www.npmjs.com/package/claude-chat-namer)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Claude Code plugin** that names, searches, and helps you resume your conversations. No more UUID chaos.
 
 Claude Code stores conversations as UUID-named `.jsonl` files. This plugin auto-names them, lets you search/rename, and makes `claude --resume` actually usable.
 
 ## Install
 
-### As Claude Code Plugin
+### As Claude Code Plugin (recommended)
+
+The repo is its own plugin marketplace. Add it once, then install the plugin:
+
+```bash
+claude plugin marketplace add Jamaalx/claude-chat-namer
+claude plugin install chat-namer@claude-chat-namer
+```
+
+Or from inside Claude Code:
+
+```
+/plugin marketplace add Jamaalx/claude-chat-namer
+/plugin install chat-namer@claude-chat-namer
+```
+
+Restart Claude Code (or run `/reload-plugins`) and the `/chat-namer:*` commands and the auto-naming hook are active. Update later with `claude plugin update chat-namer@claude-chat-namer`.
+
+### Try it without installing
 
 ```bash
 git clone https://github.com/Jamaalx/claude-chat-namer.git
@@ -31,6 +53,8 @@ claude-chat-namer list
 ### Auto-Naming (Hook)
 
 The plugin includes a `Stop` hook that **automatically names every conversation** after the first exchange. Names are generated from the first user message. No configuration needed - just install and forget.
+
+Slash commands (`/model`, `/login`, ...) and their output are ignored, so the name comes from the first thing you actually typed.
 
 ### Slash Commands (inside Claude Code)
 
@@ -85,7 +109,8 @@ claude-chat-namer help          # Show all commands
 ```
 claude-chat-namer/
 ├── .claude-plugin/
-│   └── plugin.json           # Plugin manifest
+│   ├── plugin.json           # Plugin manifest
+│   └── marketplace.json      # Marketplace manifest (lets you `claude plugin install` this repo)
 ├── skills/
 │   ├── list/SKILL.md         # /chat-namer:list
 │   ├── search/SKILL.md       # /chat-namer:search
@@ -98,9 +123,20 @@ claude-chat-namer/
 │   ├── index.js              # Core API
 │   ├── cli.js                # CLI interface
 │   └── hook-auto-name.js     # Hook script
+├── test/
+│   └── smoke.sh              # End-to-end test against a throwaway HOME
 ├── package.json
 └── README.md
 ```
+
+## Development
+
+```bash
+bash test/smoke.sh          # runs the CLI + hook against fake transcripts
+claude plugin validate .    # checks plugin.json / marketplace.json
+```
+
+CI runs the smoke test on Node 18, 20 and 22. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Zero Dependencies
 
