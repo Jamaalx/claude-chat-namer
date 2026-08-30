@@ -10,10 +10,22 @@ import {
   formatConversation,
   createPrompt,
   ask,
+  VERSION,
 } from "./index.js";
 
 const args = process.argv.slice(2);
 const command = args[0] || "interactive";
+
+// Positional arguments: everything after the command that is not a flag
+// (and not the value of --project).
+const positional = [];
+for (let i = 1; i < args.length; i++) {
+  if (args[i] === "--project") {
+    i++; // skip its value
+  } else if (!args[i].startsWith("--")) {
+    positional.push(args[i]);
+  }
+}
 
 // Colors
 const C = {
@@ -29,7 +41,7 @@ const C = {
 
 function header() {
   console.log(
-    `\n${C.cyan}${C.bold}  Claude Chat Namer${C.reset} ${C.dim}v1.0.0${C.reset}`
+    `\n${C.cyan}${C.bold}  Claude Chat Namer${C.reset} ${C.dim}v${VERSION}${C.reset}`
   );
   console.log(
     `${C.dim}  Name your Claude Code conversations${C.reset}\n`
@@ -306,10 +318,7 @@ async function main() {
       case "rename": {
         header();
         const p = await selectProject();
-        const uuid = args.find((a) => !a.startsWith("--") && a !== command);
-        const nameArgs = args.filter(
-          (a) => !a.startsWith("--") && a !== command && a !== uuid
-        );
+        const [uuid, ...nameArgs] = positional;
         await nameCommand(p, uuid, nameArgs.join(" "));
         break;
       }
@@ -318,8 +327,7 @@ async function main() {
       case "remove": {
         header();
         const p = await selectProject();
-        const uuid = args.find((a) => !a.startsWith("--") && a !== command);
-        await unnameCommand(p, uuid);
+        await unnameCommand(p, positional[0]);
         break;
       }
 
@@ -327,10 +335,7 @@ async function main() {
       case "find": {
         header();
         const p = await selectProject();
-        const query = args
-          .filter((a) => !a.startsWith("--") && a !== command)
-          .join(" ");
-        await searchCommand(p, query);
+        await searchCommand(p, positional.join(" "));
         break;
       }
 

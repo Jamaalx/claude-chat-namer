@@ -1,11 +1,21 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "fs";
-import { join, basename } from "path";
+import { join, basename, dirname } from "path";
 import { homedir } from "os";
 import { createInterface } from "readline";
+import { fileURLToPath } from "url";
 
 const CLAUDE_DIR = join(homedir(), ".claude");
 const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
 const NAMES_FILE = "chat-names.json";
+
+export const VERSION = (() => {
+  try {
+    const pkg = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+    return JSON.parse(readFileSync(pkg, "utf-8")).version;
+  } catch {
+    return "unknown";
+  }
+})();
 
 // ─── Core API ───────────────────────────────────────────────────────────────
 
@@ -16,8 +26,11 @@ export function getProjects() {
   if (!existsSync(PROJECTS_DIR)) return [];
   return readdirSync(PROJECTS_DIR)
     .filter((f) => {
-      const full = join(PROJECTS_DIR, f);
-      return statSync(full).isDirectory();
+      try {
+        return statSync(join(PROJECTS_DIR, f)).isDirectory();
+      } catch {
+        return false; // broken symlink, permission error, etc.
+      }
     })
     .map((name) => ({
       name,
@@ -59,34 +72,45 @@ export function getConversations(projectPath) {
 }
 
 /**
+ * Parse a conversation JSONL file into the bits we care about:
+ * the first real user message and the number of user/assistant turns.
+ *
+ * Shared by the CLI and the Stop hook so both produce the same names.
+ */
+export function readTranscript(filePath) {
+  const content = readFileSync(filePath, "utf-8");
+  const lines = content.split("\n").filter((l) => l.trim());
+
+  let firstMessage = null;
+  let messageCount = 0;
+
+  for (const line of lines) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue; // skip malformed lines
+    }
+    if (entry.type !== "user" && entry.type !== "assistant") continue;
+    if (entry.isSidechain) continue; // subagent traffic, not the conversation
+    messageCount++;
+
+    if (entry.type === "user" && !firstMessage && !entry.isMeta) {
+      const text = extractTextFromMessage(entry.message);
+      if (isRealUserText(text)) firstMessage = text;
+    }
+  }
+
+  return { firstMessage, messageCount };
+}
+
+/**
  * Extract a preview from a conversation JSONL file
  */
 function extractPreview(filePath) {
   try {
-    const content = readFileSync(filePath, "utf-8");
-    const lines = content.split("\n").filter((l) => l.trim());
-
-    let firstMessage = null;
-    let messageCount = 0;
-
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line);
-        if (entry.type === "user" || entry.type === "assistant") {
-          messageCount++;
-        }
-        if (entry.type === "user" && !firstMessage) {
-          firstMessage = extractTextFromMessage(entry.message);
-        }
-      } catch {
-        // skip malformed lines
-      }
-    }
-
-    const autoName = firstMessage
-      ? generateAutoName(firstMessage)
-      : "Empty conversation";
-
+    const { firstMessage, messageCount } = readTranscript(filePath);
+    const autoName = generateAutoName(firstMessage) || "Empty conversation";
     return { firstMessage, autoName, messageCount };
   } catch {
     return {
@@ -100,7 +124,7 @@ function extractPreview(filePath) {
 /**
  * Extract text content from a message object
  */
-function extractTextFromMessage(message) {
+export function extractTextFromMessage(message) {
   if (!message) return null;
 
   const content = message.content;
@@ -117,17 +141,35 @@ function extractTextFromMessage(message) {
 }
 
 /**
- * Generate a short auto-name from the first message
+ * Claude Code writes slash commands and their output into the transcript as
+ * "user" entries wrapped in <command-name>, <local-command-stdout>, etc.
+ * Those are not something the user typed, so they make terrible names.
  */
-function generateAutoName(text) {
-  if (!text) return "Empty";
+export function isRealUserText(text) {
+  if (!text) return false;
+  const t = text.trimStart();
+  return !/^<(command-name|command-message|command-args|local-command-stdout|local-command-stderr|local-command-caveat)>/.test(
+    t
+  );
+}
+
+/**
+ * Generate a short auto-name from the first message.
+ * Returns null when there is nothing usable.
+ */
+export function generateAutoName(text) {
+  if (!text) return null;
 
   // Clean up the text
   let clean = text
     .replace(/```[\s\S]*?```/g, "[code]") // remove code blocks
+    .replace(/\[Request interrupted[^\]]*\]/g, "") // interrupted-turn markers
+    .replace(/<[^>]+>/g, "") // strip <tags> (system-reminder, command markup...)
     .replace(/\n+/g, " ") // collapse newlines
     .replace(/\s+/g, " ") // collapse spaces
     .trim();
+
+  if (!clean || clean.length < 3) return null;
 
   // Take first ~60 chars, break at word boundary
   if (clean.length > 60) {
