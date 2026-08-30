@@ -1,6 +1,6 @@
 {
   "name": "claude-chat-namer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Claude Code plugin: name, search, and resume your conversations. No more UUID chaos.",
   "main": "scripts/index.js",
   "bin": {
@@ -17,8 +17,16 @@
     "resume",
     "cli"
   ],
-  "author": "alexd",
+  "author": "Alex Mantello",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jamaalx/claude-chat-namer.git"
+  },
+  "homepage": "https://github.com/Jamaalx/claude-chat-namer#readme",
+  "bugs": {
+    "url": "https://github.com/Jamaalx/claude-chat-namer/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=18.0.0"

@@ -1,11 +1,13 @@
 {
   "name": "chat-namer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Name, search, and resume your Claude Code conversations. No more UUID chaos.",
   "author": {
-    "name": "alexd"
+    "name": "Alex Mantello",
+    "url": "https://github.com/Jamaalx"
   },
   "repository": "https://github.com/Jamaalx/claude-chat-namer",
+  "homepage": "https://github.com/Jamaalx/claude-chat-namer",
   "license": "MIT",
   "keywords": [
     "claude-code",
