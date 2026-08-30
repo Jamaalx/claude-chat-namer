@@ -13,6 +13,5 @@
     "naming",
     "resume",
     "organizer"
-  ],
-  "hooks": "./hooks/hooks.json"
+  ]
 }
