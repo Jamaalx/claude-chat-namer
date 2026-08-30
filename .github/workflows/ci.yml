@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Syntax check
+        run: for f in scripts/*.js; do node --check "$f"; done
+      - name: Validate manifests are JSON
+        run: |
+          node -e 'for (const f of [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "hooks/hooks.json", "package.json"]) JSON.parse(require("fs").readFileSync(f, "utf-8"))'
+      - name: npm pack --dry-run
+        run: npm pack --dry-run
+      - name: Smoke test
+        run: bash test/smoke.sh
