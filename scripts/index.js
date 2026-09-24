@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "fs";
+import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync } from "fs";
 import { join, basename, dirname } from "path";
 import { homedir } from "os";
 import { createInterface } from "readline";
@@ -61,6 +61,7 @@ export function getConversations(projectPath) {
         file,
         path: fullPath,
         name: names[uuid]?.name || null,
+        auto: Boolean(names[uuid]?.auto), // named by the Stop hook / `auto`, not by the user
         autoName: preview.autoName,
         firstMessage: preview.firstMessage,
         messageCount: preview.messageCount,
@@ -186,7 +187,7 @@ export function generateAutoName(text) {
 
 // ─── Names persistence ─────────────────────────────────────────────────────
 
-function loadNames(namesPath) {
+export function loadNames(namesPath) {
   if (!existsSync(namesPath)) return {};
   try {
     return JSON.parse(readFileSync(namesPath, "utf-8"));
@@ -195,19 +196,26 @@ function loadNames(namesPath) {
   }
 }
 
-function saveNames(namesPath, names) {
-  writeFileSync(namesPath, JSON.stringify(names, null, 2), "utf-8");
+// Write to a temp file and rename it over the original. rename() is atomic on
+// the same filesystem, so a reader (e.g. the async Stop hook of another
+// session) never sees a half-written file. A half-written file used to parse
+// as {} and the next save then wiped every name in the project.
+export function saveNames(namesPath, names) {
+  const tmp = `${namesPath}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(names, null, 2), "utf-8");
+  renameSync(tmp, namesPath);
 }
 
 /**
  * Set a custom name for a conversation
  */
-export function nameConversation(projectPath, uuid, name) {
+export function nameConversation(projectPath, uuid, name, { auto = false } = {}) {
   const namesPath = join(projectPath, NAMES_FILE);
   const names = loadNames(namesPath);
   names[uuid] = {
     name,
     namedAt: new Date().toISOString(),
+    ...(auto ? { auto: true } : {}),
   };
   saveNames(namesPath, names);
   return true;
@@ -248,7 +256,7 @@ export function autoNameAll(projectPath) {
 
   for (const conv of conversations) {
     if (!conv.name && conv.autoName && conv.autoName !== "Empty conversation") {
-      nameConversation(projectPath, conv.uuid, conv.autoName);
+      nameConversation(projectPath, conv.uuid, conv.autoName, { auto: true });
       named++;
     }
   }
@@ -270,7 +278,7 @@ export function formatConversation(conv, index) {
     minute: "2-digit",
   });
   const sizeKb = (conv.size / 1024).toFixed(0);
-  const tag = conv.name ? "\x1b[32m[named]\x1b[0m" : "\x1b[90m[auto]\x1b[0m";
+  const tag = conv.name && !conv.auto ? "\x1b[32m[named]\x1b[0m" : "\x1b[90m[auto]\x1b[0m";
 
   return `  ${String(index + 1).padStart(3)}. ${tag} ${name}\n       ${date} | ${conv.messageCount} msgs | ${sizeKb} KB | ${conv.uuid.substring(0, 8)}...`;
 }

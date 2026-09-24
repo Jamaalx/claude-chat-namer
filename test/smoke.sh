@@ -107,6 +107,12 @@ out="$(hook "{\"session_id\":\"$U1\",\"transcript_path\":\"$PROJ/$U1.jsonl\",\"c
 grep -q '"name": "Help me fix the wolt integration timeout bug in the order..."' "$PROJ/chat-names.json" || fail "hook did not name $U1"
 grep -q '"auto": true' "$PROJ/chat-names.json" || fail "hook name not flagged auto"
 
+# hook-generated names are still shown as [auto], not as user names
+out="$($CLI list --project demo)"
+assert_contains "[auto] Help me fix the wolt integration timeout bug in the order..." "$out"
+assert_not_contains "[named] Help me fix" "$out"
+ls "$PROJ" | grep -q '\.tmp$' && fail "temp file left behind by saveNames"
+
 # slash-command session: the caveat/command lines must be skipped
 hook "{\"transcript_path\":\"$PROJ/$U4.jsonl\",\"hook_event_name\":\"Stop\"}" > /dev/null
 grep -q '"name": "Add a CHANGELOG to the repo"' "$PROJ/chat-names.json" || fail "hook named the slash-command session wrong: $(cat "$PROJ/chat-names.json")"

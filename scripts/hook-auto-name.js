@@ -8,24 +8,11 @@
  * Output: { continue: true }
  */
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { existsSync } from "fs";
 import { join, dirname, basename } from "path";
-import { readTranscript, generateAutoName } from "./index.js";
+import { readTranscript, generateAutoName, loadNames, saveNames } from "./index.js";
 
 const NAMES_FILE = "chat-names.json";
-
-function loadNames(path) {
-  if (!existsSync(path)) return {};
-  try {
-    return JSON.parse(readFileSync(path, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-function saveNames(path, names) {
-  writeFileSync(path, JSON.stringify(names, null, 2), "utf-8");
-}
 
 // Note: no process.exit() after writing. On macOS/Windows a piped stdout is
 // asynchronous, so exiting right away can truncate the JSON Claude reads.
