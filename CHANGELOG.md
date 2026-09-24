@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Maintenance pass of 2026-09-24.
+
+### Fixed
+
+- `chat-names.json` is written atomically (temp file + rename). The Stop
+  hook runs async, one per session; a reader that caught a half-written
+  file parsed it as `{}` and the next save wiped every name in the project.
+- Without `--project` the CLI, and so every `/chat-namer:*` skill, used
+  whichever project directory came first instead of the one Claude Code is
+  running in. It now resolves `CLAUDE_PROJECT_DIR` / the current directory
+  (or its closest parent) first.
+- Names written by the Stop hook or `auto` were shown as `[named]`; they are
+  `[auto]` again, so `[named]` means a name you chose.
+- Interactive mode: after a search, typing a number renamed the conversation
+  with that number in the original list instead of the search hit.
+- Interactive mode crashed on a non-numeric project choice.
+
+### Changed
+
+- `list` / `search` print the full UUID, so `/chat-namer:resume` can hand you
+  a working `claude --resume <uuid>` command.
+- `npm test` runs the smoke test; `prepublishOnly` runs it before a publish.
+  `CHANGELOG.md` ships in the npm package.
+- Dependabot checks npm and GitHub Actions monthly.
+
 ## [1.0.1] - 2026-08-30
 
 ### Fixed
