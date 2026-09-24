@@ -298,7 +298,7 @@ export function formatConversation(conv, index) {
   const sizeKb = (conv.size / 1024).toFixed(0);
   const tag = conv.name && !conv.auto ? "\x1b[32m[named]\x1b[0m" : "\x1b[90m[auto]\x1b[0m";
 
-  return `  ${String(index + 1).padStart(3)}. ${tag} ${name}\n       ${date} | ${conv.messageCount} msgs | ${sizeKb} KB | ${conv.uuid.substring(0, 8)}...`;
+  return `  ${String(index + 1).padStart(3)}. ${tag} ${name}\n       ${date} | ${conv.messageCount} msgs | ${sizeKb} KB | ${conv.uuid}`;
 }
 
 // ─── Interactive CLI helpers ────────────────────────────────────────────────

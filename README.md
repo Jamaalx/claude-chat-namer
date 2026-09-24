@@ -76,10 +76,10 @@ Instead of scrolling through UUIDs, find any conversation by keyword:
 Found 4 conversations matching "wolt":
 
   1. [named] Wolt Automation - Camoufox
-     Mar 19 | 1088 msgs | c348d36f...
+     Mar 19 | 1088 msgs | c348d36f-8002-40ca-8523-17821d6a0bea
 
   2. [named] Implement Wolt Purchases plan...
-     Feb 18 | 361 msgs | c0e56e5c...
+     Feb 18 | 361 msgs | c0e56e5c-1b7e-4c1f-9d2a-5e8f3a6b7c90
 
 Run in a new terminal:
   claude --resume c348d36f-8002-40ca-8523-17821d6a0bea

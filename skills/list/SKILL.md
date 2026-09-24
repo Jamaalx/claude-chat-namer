@@ -11,7 +11,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/cli.js list
 Present the output to the user in a clean format. The output shows:
 - `[named]` (green) = has a custom name
 - `[auto]` (gray) = auto-generated name from first message
-- Date, message count, size, and UUID prefix for each conversation
+- Date, message count, size, and full UUID for each conversation (use it with `claude --resume <uuid>`)
 
 If the user wants to rename one, ask which number and what name to give it, then use:
 ```bash

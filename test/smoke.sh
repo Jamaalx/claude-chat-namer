@@ -85,7 +85,7 @@ assert_contains "No Claude Code projects found." "$(HOME=$(mktemp -d) $CLI list)
 echo "- search"
 out="$($CLI search wolt --project demo)"
 assert_contains "1 result(s) for \"wolt\"" "$out"
-assert_contains "aaaaaaaa..." "$out"
+assert_contains "aaaaaaaa-1111-4111-8111-111111111111" "$out"   # full UUID, needed for claude --resume
 assert_contains "No conversations matching \"zzz\"" "$($CLI search zzz --project demo)"
 
 echo "- rename / unname (with --project before the positional args)"
