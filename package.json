@@ -6,6 +6,10 @@
   "bin": {
     "claude-chat-namer": "scripts/cli.js"
   },
+  "scripts": {
+    "test": "bash test/smoke.sh",
+    "prepublishOnly": "bash test/smoke.sh"
+  },
   "keywords": [
     "claude",
     "claude-code",
@@ -37,6 +41,7 @@
     "skills/",
     "hooks/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ]
 }

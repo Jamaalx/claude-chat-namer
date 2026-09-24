@@ -1,6 +1,11 @@
 version: 2
 updates:
+  # No runtime dependencies today; this catches any that get added later.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
