@@ -198,6 +198,9 @@ async function interactiveMode() {
     `\n${C.dim}  Commands: [number] to rename, [s]earch, [a]uto-name all, [q]uit${C.reset}`
   );
 
+  // The numbers the user types refer to the list printed last
+  // (the full list, a search result or a refreshed list).
+  let shown = conversations;
   const rl = createPrompt();
 
   while (true) {
@@ -214,6 +217,7 @@ async function interactiveMode() {
       if (results.length === 0) {
         console.log(`${C.yellow}  No results.${C.reset}`);
       } else {
+        shown = results;
         results.forEach((conv, i) => {
           console.log(formatConversation(conv, i));
         });
@@ -231,15 +235,16 @@ async function interactiveMode() {
 
     if (trimmed === "l" || trimmed === "list") {
       const convs = getConversations(projectPath);
+      shown = convs;
       convs.forEach((conv, i) => {
         console.log(formatConversation(conv, i));
       });
       continue;
     }
 
-    const num = parseInt(trimmed);
-    if (!isNaN(num) && num >= 1 && num <= conversations.length) {
-      const conv = conversations[num - 1];
+    const num = parseInt(trimmed, 10);
+    if (!isNaN(num) && num >= 1 && num <= shown.length) {
+      const conv = shown[num - 1];
       console.log(
         `\n  ${C.dim}Current: ${conv.name || conv.autoName}${C.reset}`
       );
