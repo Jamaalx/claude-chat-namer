@@ -75,6 +75,10 @@ assert_not_contains "<command-name>" "$out"
 echo "- list (empty project)"
 assert_contains "No conversations found." "$($CLI list --project empty)"
 
+echo "- list (no --project: picks the project of the current directory)"
+assert_contains "No conversations found." "$(CLAUDE_PROJECT_DIR=/home/user/empty $CLI list)"
+assert_contains "4 conversation(s)" "$(CLAUDE_PROJECT_DIR=/home/user/demo/src/deep $CLI list)"
+
 echo "- list (no ~/.claude at all)"
 assert_contains "No Claude Code projects found." "$(HOME=$(mktemp -d) $CLI list)"
 

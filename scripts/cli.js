@@ -2,6 +2,7 @@
 
 import {
   getProjects,
+  findProjectForDir,
   getConversations,
   nameConversation,
   unnameConversation,
@@ -156,10 +157,12 @@ async function interactiveMode() {
   }
 
   let projectPath;
+  const here = findProjectForDir(projects, process.env.CLAUDE_PROJECT_DIR || process.cwd());
+  const single = projects.length === 1 ? projects[0] : here;
 
-  if (projects.length === 1) {
-    projectPath = projects[0].path;
-    console.log(`${C.dim}  Project: ${projects[0].displayName}${C.reset}\n`);
+  if (single) {
+    projectPath = single.path;
+    console.log(`${C.dim}  Project: ${single.displayName}${C.reset}\n`);
   } else {
     console.log(`${C.bold}  Select a project:${C.reset}\n`);
     projects.forEach((p, i) => {
@@ -170,8 +173,8 @@ async function interactiveMode() {
     const choice = await ask(rl, `\n  ${C.cyan}>${C.reset} `);
     rl.close();
 
-    const idx = parseInt(choice) - 1;
-    if (idx < 0 || idx >= projects.length) {
+    const idx = parseInt(choice, 10) - 1;
+    if (Number.isNaN(idx) || idx < 0 || idx >= projects.length) {
       console.log(`${C.yellow}  Invalid choice.${C.reset}`);
       process.exit(1);
     }
@@ -294,8 +297,11 @@ async function selectProject() {
     process.exit(1);
   }
 
-  // Default to first project
-  return projects[0].path;
+  // Default to the project of the current directory (the skills run inside
+  // Claude Code, so that is the conversation list the user expects), then
+  // fall back to the first project.
+  const here = findProjectForDir(projects, process.env.CLAUDE_PROJECT_DIR || process.cwd());
+  return (here || projects[0]).path;
 }
 
 async function main() {
@@ -373,7 +379,7 @@ async function main() {
         console.log();
         console.log(`${C.bold}  Options:${C.reset}`);
         console.log(
-          `    --project <name>   Select project (default: first found)`
+          `    --project <name>   Select project (default: current directory, else first found)`
         );
         console.log();
         break;

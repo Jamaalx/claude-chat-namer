@@ -40,6 +40,24 @@ export function getProjects() {
 }
 
 /**
+ * Claude Code stores the transcripts of a working directory in
+ * ~/.claude/projects/<dir with every non-alphanumeric char replaced by "-">.
+ * Return the project for `dir` (or its closest parent that has one).
+ */
+export function findProjectForDir(projects, dir) {
+  let current = dir;
+  while (current) {
+    const encoded = current.replace(/[^a-zA-Z0-9]/g, "-");
+    const match = projects.find((p) => p.name === encoded);
+    if (match) return match;
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+/**
  * Get all conversations for a project
  */
 export function getConversations(projectPath) {
