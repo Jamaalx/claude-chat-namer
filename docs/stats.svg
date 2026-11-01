@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="400" viewBox="0 0 820 400" role="img" aria-labelledby="t d">
 <title id="t">chat-namer in numbers</title>
-<desc id="d">412 installs from the Anthropic plugin directory, 51,610 loads with 0 errors, 13 active accounts in the last 28 days, 233 npm downloads. npm downloads per month, March to October 2026: Mar 112, Apr 16, May 23, Jun 37, Jul 12, Aug 13, Sep 13, Oct 7. 82% of directory installs come from Claude.ai.</desc>
+<desc id="d">412 installs from the Anthropic plugin directory, 51,610 loads with 0 errors, 13 active accounts in the last 28 days, 0 uninstalls, 327 accounts. npm downloads per month (233 in total), March to October 2026: Mar 112, Apr 16, May 23, Jun 37, Jul 12, Aug 13, Sep 13, Oct 7. 82% of directory installs come from Claude.ai, the rest mostly from Cowork.</desc>
 <style>
 :root{--bg:#ffffff;--card:#f6f8fa;--ink:#1f2328;--ink2:#59636e;--muted:#818b98;--grid:#d1d9e0;--bar:#D9773F}
 @media (prefers-color-scheme:dark){:root{--bg:#0d1117;--card:#151b23;--ink:#f0f6fc;--ink2:#9198a1;--muted:#768390;--grid:#30363d;--bar:#D9773F}}
@@ -15,7 +15,7 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 <rect x="24.0" y="72" width="184.0" height="92" rx="8" fill="var(--card)"/>
 <text x="40.0" y="110" class="n">412</text>
 <text x="40.0" y="132" class="l">installs</text>
-<text x="40.0" y="150" class="m">Anthropic directory, all time</text>
+<text x="40.0" y="150" class="m">327 accounts, all time</text>
 <rect x="220.0" y="72" width="184.0" height="92" rx="8" fill="var(--card)"/>
 <text x="236.0" y="110" class="n">51,610</text>
 <text x="236.0" y="132" class="l">loads, 0 errors</text>
@@ -25,10 +25,10 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 <text x="432.0" y="132" class="l">active accounts</text>
 <text x="432.0" y="150" class="m">last 28 days</text>
 <rect x="612.0" y="72" width="184.0" height="92" rx="8" fill="var(--card)"/>
-<text x="628.0" y="110" class="n">233</text>
-<text x="628.0" y="132" class="l">npm downloads</text>
-<text x="628.0" y="150" class="m">since Mar 19, 2026</text>
-<text x="24" y="200" class="l">npm downloads per month, 2026</text>
+<text x="628.0" y="110" class="n">0</text>
+<text x="628.0" y="132" class="l">uninstalls</text>
+<text x="628.0" y="150" class="m">Anthropic directory, all time</text>
+<text x="24" y="200" class="l">npm downloads per month, 2026 (233 in total)</text>
 <line x1="56" x2="796" y1="346.0" y2="346.0" stroke="var(--grid)" stroke-width="1"/>
 <text x="48" y="350.0" class="ax" text-anchor="end">0</text>
 <line x1="56" x2="796" y1="302.0" y2="302.0" stroke="var(--grid)" stroke-width="1"/>
@@ -61,5 +61,5 @@ text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,san
 <path d="M726.6,346 V343.8 Q726.6,339.8 730.6,339.8 H768.9 Q772.9,339.8 772.9,343.8 V346 Z" fill="var(--bar)"><title>Oct: 7 downloads</title></path>
 <text x="749.7" y="333.8" class="v" text-anchor="middle">7</text>
 <text x="749.8" y="362" class="ax" text-anchor="middle">Oct</text>
-<text x="24" y="386" class="m">82% of directory installs come from Claude.ai · npm ships v1.0.0; the plugin directory serves the latest version</text>
+<text x="24" y="386" class="m">Directory installs come from Claude.ai (82%) and Cowork · npm ships v1.0.0; the directory serves the latest version</text>
 </svg>

@@ -16,7 +16,18 @@ Claude Code stores conversations as UUID-named `.jsonl` files. This plugin names
 
 Small, but real: published in Anthropic's plugin directory on Oct 2, 2026, and used since.
 
-<p align="center"><img src="docs/stats.svg" alt="chat-namer in numbers: 412 installs from the Anthropic plugin directory, 51,610 loads with 0 errors, 13 active accounts in the last 28 days, 233 npm downloads" width="820"></p>
+<p align="center"><img src="docs/stats.svg" alt="chat-namer in numbers: 412 installs by 327 accounts from the Anthropic plugin directory, 51,610 loads with 0 errors, 13 active accounts in the last 28 days, 0 uninstalls, 233 npm downloads" width="820"></p>
+
+<details>
+<summary>Screenshots from the Anthropic plugin directory dashboard (Nov 1, 2026)</summary>
+
+<br>
+
+<img src="docs/directory/usage-overview.png" alt="Directory usage: rank 1,665, 412 installs, 13 active accounts, 30 uses, 0% load error rate over 51,610 loads, new installs per day on Claude.ai" width="820">
+
+<img src="docs/directory/installs-by-surface.png" alt="New installs per day by surface, Claude.ai and Cowork, since late September" width="400"> <img src="docs/directory/active-accounts.png" alt="Accounts that used the plugin each day, since late September" width="400">
+
+</details>
 
 <p align="center">
   <a href="https://star-history.com/#Jamaalx/claude-chat-namer&Date">
