@@ -10,7 +10,7 @@ Listed in Anthropic's plugin directory.
 
 Claude Code stores conversations as UUID-named `.jsonl` files. This plugin names them, searches everything you typed across all your projects, gives you a `claude --resume` command that works from anywhere, and can pull an old conversation's context into the one you are in.
 
-> Works wherever Claude Code keeps its transcripts on disk: the terminal, the desktop app and the IDE extensions. In claude.ai chats there are no local transcripts to read.
+> Full features in Claude Code (terminal, desktop app, IDE). In Claude.ai and the other Claude apps it finds and recaps chats through Claude's past-chat search.
 
 ## Install
 
@@ -68,55 +68,34 @@ Every conversation gets the best name available, tagged with its source:
 
 A `Stop` hook also gives each new conversation a first-message name after its first exchange, as a fallback. No configuration needed.
 
-### Search everything you typed, in every project
+### Just ask
+
+No commands to remember. Ask Claude the way you would ask a colleague, in any language:
 
 ```
-> /chat-namer:search stripe webhook
+> where did we talk about the stripe webhook?
 
-2 result(s) for "stripe webhook":
-
-  1. [renamed] Stripe billing
-     Oct 28, 09:12 PM | 214 msgs | 1890 KB | /home/me/shop | eeee5555-...
-  2. [ai] Checkout refactor
-     Oct 12, 04:40 PM | 96 msgs | 702 KB | /home/me/api | 1a2b3c4d-...
-     "...then verify the stripe webhook signature before we mark the order paid..."
-```
-
-Every word must match, in any order. Title hits come first; content hits show where they matched. Subagent traffic and tool output are left out.
-
-### Resume from anywhere
-
-`claude --resume <uuid>` only finds a conversation from the directory it was started in. chat-namer gives you the full command:
-
-```
-> /chat-namer:resume stripe
-
-  Stripe billing
-
-  Run in a new terminal:
+  "Stripe billing", Oct 28, in /home/me/shop. To reopen it in a new terminal:
     cd /home/me/shop && claude --resume eeee5555-5555-4555-8555-555555555555
+  Want me to pull it in here instead?
+
+> yes, continue where we left off
+
+  That chat stopped after adding signature verification; the open question
+  was whether to retry failed events. ...
 ```
 
-From a terminal, `claude-chat-namer resume stripe` launches it directly.
+Three skills do the work and Claude picks them on its own:
 
-### Recap: continue an old thread here
+| Skill | When it runs | Also as |
+|-------|--------------|---------|
+| `find` | "where did we talk about...", "that chat about...", "my recent chats" | `/chat-namer:find <words>` |
+| `recap` | "continue what we did on...", "where did we leave..." | `/chat-namer:recap <words>` |
+| `rename` | "name this chat", "give my chats proper names" | `/chat-namer:rename` |
 
-```
-> /chat-namer:recap checkout refactor
-```
+Search covers everything you typed in every project (all words must match, any order; title hits first, content hits with a snippet). The resume command includes the `cd`, because `claude --resume` only finds a conversation from the directory it was started in. Subagent traffic and tool output are left out.
 
-Claude reads the last exchanges of that conversation (your messages and its answers, no tool output) and tells you where it stopped, so you can carry on in the current session without switching.
-
-### Slash Commands (inside Claude Code)
-
-| Command | Description |
-|---------|-------------|
-| `/chat-namer:list [all]` | List conversations (this project, or all) |
-| `/chat-namer:search <query>` | Search titles and everything you typed, across all projects |
-| `/chat-namer:resume <query>` | Get the `cd <dir> && claude --resume <uuid>` command |
-| `/chat-namer:recap <query>` | Pull an earlier conversation's last messages into this one |
-| `/chat-namer:rename` | Rename a conversation |
-| `/chat-namer:auto-name` | Give a first-message name to every unnamed conversation |
+**In Claude.ai and the other Claude apps** the same skills use Claude's own past-chat search when your plan and settings allow it (Settings > Capabilities): they find the chat and give you its link, pull its context into the current chat, and suggest clear names for you to set.
 
 ### CLI Usage
 
@@ -154,12 +133,9 @@ claude-chat-namer/
 │   └── marketplace.json      # Marketplace manifest (lets you `claude plugin install` this repo)
 ├── assets/icon.svg           # Directory icon
 ├── skills/
-│   ├── list/SKILL.md         # /chat-namer:list
-│   ├── search/SKILL.md       # /chat-namer:search
-│   ├── rename/SKILL.md       # /chat-namer:rename
-│   ├── resume/SKILL.md       # /chat-namer:resume
-│   ├── recap/SKILL.md        # /chat-namer:recap
-│   └── auto-name/SKILL.md    # /chat-namer:auto-name
+│   ├── find/SKILL.md         # find / list / resume earlier conversations
+│   ├── recap/SKILL.md        # continue an earlier conversation here
+│   └── rename/SKILL.md       # name conversations
 ├── hooks/
 │   └── hooks.json            # Stop hook for auto-naming
 ├── scripts/

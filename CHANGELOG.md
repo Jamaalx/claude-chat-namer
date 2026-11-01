@@ -5,6 +5,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-01
+
+### Changed
+
+- **Just ask.** The six slash commands are now three skills Claude uses on
+  its own when you talk about past conversations, in any language:
+  `find` (replaces `list`, `search` and `resume`), `recap`, and `rename`
+  (now also covers `auto-name`). They still work as `/chat-namer:find`,
+  `/chat-namer:recap` and `/chat-namer:rename`.
+- `rename` points to Claude Code's built-in `/rename` for the current
+  conversation, so the name shows up in `claude --resume` too.
+
+### Added
+
+- **Claude.ai and other Claude apps.** The skills fall back to Claude's own
+  past-chat search there: find a chat and give its link, recap it into the
+  current chat, suggest names to set from the chat menu. When past-chat
+  search is not available, they say how to turn it on.
+
 ## [1.1.0] - 2026-11-01
 
 ### Added
