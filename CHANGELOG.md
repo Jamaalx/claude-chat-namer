@@ -5,17 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0] - 2026-11-01
-
-### Changed
-
-- **Just ask.** The six slash commands are now three skills Claude uses on
-  its own when you talk about past conversations, in any language:
-  `find` (replaces `list`, `search` and `resume`), `recap`, and `rename`
-  (now also covers `auto-name`). They still work as `/chat-namer:find`,
-  `/chat-namer:recap` and `/chat-namer:rename`.
-- `rename` points to Claude Code's built-in `/rename` for the current
-  conversation, so the name shows up in `claude --resume` too.
+## [1.1.0] - 2026-11-01
 
 ### Added
 
@@ -23,11 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   past-chat search there: find a chat and give its link, recap it into the
   current chat, suggest names to set from the chat menu. When past-chat
   search is not available, they say how to turn it on.
-
-## [1.1.0] - 2026-11-01
-
-### Added
-
 - **Native titles.** Claude Code now titles conversations itself (`ai-title`)
   and `/rename` stores your own title in the transcript. chat-namer shows
   them, in this order: `/rename` > your chat-namer name > Claude's title >
@@ -39,11 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Full-text search.** `search` looks at everything you typed in a
   conversation, not only the first message. Every word must match, in any
   order; title hits rank first, content hits show a snippet.
-- **`resume`** command and a smarter `/chat-namer:resume`: the command now
+- **`resume`** command (used by the `find` skill): the command now
   includes the directory (`cd <dir> && claude --resume <uuid>`), because
   `claude --resume` only finds a session from where it started. Outside
   Claude Code, `claude-chat-namer resume <query>` launches it directly.
-- **`recap`** command and `/chat-namer:recap` skill: pulls the last
+- **`recap`** command and skill: pulls the last
   exchanges of an earlier conversation into the current one, so you can
   continue that work without resuming it.
 - **`--json`** output for `list`, `search`, `resume` and `recap`.
@@ -51,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Just ask.** The six slash commands are now three skills Claude uses on
+  its own when you talk about past conversations, in any language:
+  `find` (replaces `list`, `search` and `resume`), `recap`, and `rename`
+  (now also covers `auto-name`). They still work as `/chat-namer:find`,
+  `/chat-namer:recap` and `/chat-namer:rename`.
+- `rename` points to Claude Code's built-in `/rename` for the current
+  conversation, so the name shows up in `claude --resume` too.
 - Transcripts are streamed in 1 MB chunks instead of read whole, and the
   metadata is cached in `~/.claude/chat-namer/cache.json`. Transcripts are
   append-only, so a grown file is read only from where the last run stopped.
