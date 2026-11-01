@@ -114,10 +114,41 @@ Three skills do the work and Claude picks them on its own:
 | `find` | "where did we talk about...", "that chat about...", "my recent chats" | `/chat-namer:find <words>` |
 | `recap` | "continue what we did on...", "where did we leave..." | `/chat-namer:recap <words>` |
 | `rename` | "name this chat", "give my chats proper names" | `/chat-namer:rename` |
+| `sync-setup` | "sync my chats between my laptop and my server" | `/chat-namer:sync-setup` |
+| `move` | "send this chat to my laptop", "bring the chat from the server" | `/chat-namer:move` |
+| `inbox` | "look at the screenshot I just sent" | `/chat-namer:inbox` |
 
 Search covers everything you typed in every project (all words must match, any order; title hits first, content hits with a snippet). The resume command includes the `cd`, because `claude --resume` only finds a conversation from the directory it was started in. Subagent traffic and tool output are left out.
 
 **In Claude.ai and the other Claude apps** the same skills use Claude's own past-chat search when your plan and settings allow it (Settings > Capabilities): they find the chat and give you its link, pull its context into the current chat, and suggest clear names for you to set.
+
+### Across machines
+
+Same account on a laptop, a server and a desktop? Each machine keeps its own conversations. chat-namer can bring them together through a folder you keep in sync between them, with whatever you already use:
+
+- **Syncthing over Tailscale** (recommended if you have Tailscale): direct and private, no cloud in between
+- **a cloud folder** you already have: Dropbox, OneDrive, Google Drive, iCloud
+- **Syncthing** on its own, or **a private git repo**
+
+Ask Claude to *"set up sync between my machines"* on each machine; it installs and configures what is needed, with your approval at each step. Then, from any machine:
+
+```
+> where did we talk about the nginx cache?
+    [server] "Nginx cache tuning", Oct 30, in /srv/api
+
+> continue that here
+    (recap of the server conversation, in this session)
+
+> send this chat to my laptop            (on the server)
+> bring the chat from the server here    (on the laptop)
+    cd C:\code\api; claude --resume 1a2b3c4d-...
+
+> look at the screenshot I just sent
+```
+
+- **Search and recap** work across machines right away. What a machine shares is a small index (titles, what you typed, the last exchanges), with secrets such as API keys, tokens and passwords redacted before they leave the machine. Projects you exclude are never shared.
+- **Moving a whole conversation** copies its full transcript, only when you ask, and rewrites its working directory for the other machine (`sync map` remembers where each project lives there). Experimental: the transcript format is Claude Code's own and undocumented.
+- **Files and screenshots**: drop them in the shared `inbox` folder, or with Tailscale use "Send with Tailscale" on the file. Ask Claude to look at the latest one. No `scp`, no paths.
 
 ### CLI Usage
 
@@ -130,6 +161,11 @@ claude-chat-namer recap stripe --all       # Print the last messages
 claude-chat-namer name c348 "Wolt Automation"  # Name by UUID prefix
 claude-chat-namer unname c348              # Remove a name
 claude-chat-namer auto                     # Auto-name all unnamed
+claude-chat-namer sync init --dir ~/Sync/chat-namer   # Share through a synced folder
+claude-chat-namer sync                     # Machines, sent conversations, settings
+claude-chat-namer send stripe --all        # Put a whole conversation in the folder
+claude-chat-namer receive stripe           # Install it here, ready for claude --resume
+claude-chat-namer inbox --latest           # Newest file in the shared inbox
 claude-chat-namer help                     # All commands and options
 ```
 
@@ -144,7 +180,7 @@ Transcripts are streamed, never loaded whole, and the metadata is cached. Transc
 1. Scans `~/.claude/projects/` (or `$CLAUDE_CONFIG_DIR/projects/`) for conversation `.jsonl` files
 2. Reads titles, the directory, and what you typed from each transcript
 3. Stores your names in a `chat-names.json` file (per project directory) and a speed cache in `~/.claude/chat-namer/`
-4. **Never modifies conversation files** and makes no network requests. See [PRIVACY.md](PRIVACY.md)
+4. **Never modifies existing conversation files** and makes no network requests of its own; across machines it only reads and writes the folder you chose. See [PRIVACY.md](PRIVACY.md)
 
 ## Plugin Structure
 
@@ -157,12 +193,16 @@ claude-chat-namer/
 ├── skills/
 │   ├── find/SKILL.md         # find / list / resume earlier conversations
 │   ├── recap/SKILL.md        # continue an earlier conversation here
-│   └── rename/SKILL.md       # name conversations
+│   ├── rename/SKILL.md       # name conversations
+│   ├── sync-setup/SKILL.md   # connect your machines
+│   ├── move/SKILL.md         # move a conversation to another machine
+│   └── inbox/SKILL.md        # files sent from another device
 ├── hooks/
 │   └── hooks.json            # Stop hook for auto-naming
 ├── scripts/
 │   ├── index.js              # Core API
 │   ├── cli.js                # CLI interface
+│   ├── sync.js               # Machines: shared index, send/receive, inbox
 │   └── hook-auto-name.js     # Hook script
 ├── test/
 │   └── smoke.sh              # End-to-end test against a throwaway HOME

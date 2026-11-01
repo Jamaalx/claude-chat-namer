@@ -8,9 +8,32 @@
  * Output: { continue: true }
  */
 
-import { existsSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { join, dirname, basename } from "path";
-import { readTranscript, generateAutoName, loadNames, saveNames } from "./index.js";
+import { spawn } from "child_process";
+import { fileURLToPath } from "url";
+import { readTranscript, generateAutoName, loadNames, saveNames, CLAUDE_DIR } from "./index.js";
+
+const EXPORT_EVERY_MS = 2 * 60 * 1000;
+
+// When sync is set up, refresh this machine's shared index in a detached
+// process (at most every 2 minutes), so the hook itself stays instant.
+function maybeExport() {
+  try {
+    const cfg = join(CLAUDE_DIR, "chat-namer", "config.json");
+    if (!existsSync(cfg)) return;
+    const state = join(CLAUDE_DIR, "chat-namer", "export-state.json");
+    if (existsSync(state) && Date.now() - statSync(state).mtimeMs < EXPORT_EVERY_MS) return;
+    const cli = join(dirname(fileURLToPath(import.meta.url)), "cli.js");
+    spawn(process.execPath, [cli, "sync", "export", "--quiet"], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    }).unref();
+  } catch {
+    // never block Claude
+  }
+}
 
 const NAMES_FILE = "chat-names.json";
 
@@ -28,6 +51,7 @@ async function main() {
       input += chunk;
     }
 
+    maybeExport();
     const hookData = JSON.parse(input);
     const transcriptPath = hookData.transcript_path;
 

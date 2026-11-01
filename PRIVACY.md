@@ -9,7 +9,7 @@ This plugin does **not** collect, store, or transmit any user data to external s
 - The plugin reads Claude Code conversation files stored locally on your machine (`~/.claude/projects/`)
 - Conversation names are stored in a local `chat-names.json` file alongside your existing conversation files
 - All processing happens locally on your machine
-- No network requests are made
+- No network requests are made by the plugin
 - No analytics or telemetry
 
 ## Data Storage
@@ -31,9 +31,39 @@ config directory (`~/.claude`, or `$CLAUDE_CONFIG_DIR`):
    directory, and never leaves your machine. Delete it at any time; it is
    rebuilt on the next run.
 
+## Across machines (optional, off until you set it up)
+
+When you run `sync init`, chat-namer writes into the folder you chose:
+
+- `machines/<this machine>/index.json` and `recaps/`: for up to 300 recent
+  conversations, the title, working directory, message count, the first
+  message, up to 16 KB of what you typed, and the last exchanges between you
+  and Claude (no tool output). Before writing, it replaces anything that
+  looks like a secret (API keys, tokens, JWTs, private keys, passwords,
+  credentials in URLs, long random strings) with `[redacted]`. Redaction is
+  pattern-based and can miss things, so exclude projects with sensitive
+  data (`sync init --exclude ...`); excluded projects are never written.
+- `sent/<id>/`: the **full, unredacted** transcript of a conversation, only
+  when you run `send` for it.
+- `inbox/`: files you put there yourself.
+
+Where that folder goes is up to you. With a cloud folder (Dropbox, OneDrive,
+Google Drive, iCloud) its contents are stored by that provider; with
+Syncthing they travel encrypted between your own devices.
+
+chat-namer itself still makes no network requests. Locally it may run
+`tailscale status` (to name the machine) and `tailscale file get` (to
+collect files sent to this machine with Taildrop into the inbox, when you
+ask for the inbox).
+
+`receive` writes a sent conversation into Claude Code's own projects folder
+(`~/.claude/projects/`) so `claude --resume` can find it, with its working
+directory changed to the local path. If a copy already exists it is only
+replaced with `--force`, and the old copy is kept as a backup.
+
 ## Permissions
 
-The plugin requires filesystem access only to read conversation files and write the `chat-names.json` naming metadata and the cache file.
+The plugin requires filesystem access only to read conversation files, write the `chat-names.json` naming metadata and the cache file, and, when you set up sync, read and write the folder you chose.
 
 ## Contact
 

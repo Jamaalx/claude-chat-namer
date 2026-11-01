@@ -19,13 +19,26 @@ import {
   VERSION,
   PROJECTS_DIR,
 } from "./index.js";
+import {
+  loadConfig,
+  initSync,
+  addPathMap,
+  exportIndex,
+  getRemoteConversations,
+  listMachines,
+  readRemoteRecap,
+  sendConversation,
+  listSent,
+  receiveConversation,
+  listInbox,
+} from "./sync.js";
 
 const args = process.argv.slice(2);
 const command = args[0] || "interactive";
 
 // Positional arguments: everything after the command that is not a flag
 // (and not the value of --project).
-const VALUE_FLAGS = new Set(["--project", "--limit", "--turns"]);
+const VALUE_FLAGS = new Set(["--project", "--limit", "--turns", "--dir", "--machine", "--exclude", "--cwd", "--to"]);
 const positional = [];
 for (let i = 1; i < args.length; i++) {
   if (VALUE_FLAGS.has(args[i])) {
@@ -84,7 +97,8 @@ function toJson(conv) {
     messages: conv.messageCount,
     lastModified: conv.lastModified.toISOString(),
     sizeKb: Math.round(conv.size / 1024),
-    resume: resumeCommand(conv),
+    resume: conv.remote ? null : resumeCommand(conv),
+    ...(conv.machine ? { machine: conv.machine } : {}),
     ...(conv.match ? { match: conv.match } : {}),
     ...(conv.snippet ? { snippet: conv.snippet } : {}),
   };
@@ -106,9 +120,14 @@ function printConversations(list, heading) {
   console.log();
 }
 
-// --all → every project; otherwise the selected one.
+// --all → every project, plus other machines when sync is set up
+// (--local keeps it to this machine); otherwise the selected project.
 async function loadConversations() {
-  if (ALL) return getAllConversations();
+  if (ALL) {
+    const local = getAllConversations();
+    if (flag("--local")) return local;
+    return [...local, ...getRemoteConversations()].sort((a, b) => b.lastModified - a.lastModified);
+  }
   return getConversations(await selectProject());
 }
 
@@ -192,6 +211,20 @@ async function pickOne(ref, usage) {
 async function resumeCmd(ref) {
   const conv = await pickOne(ref, "claude-chat-namer resume <uuid-prefix | query> [--all] [--print]");
   if (!conv) return;
+  if (conv.remote) {
+    const here = loadConfig()?.machine || "this machine";
+    if (JSON_OUT) {
+      console.log(JSON.stringify(toJson(conv), null, 2));
+      return;
+    }
+    console.log(`  ${C.bold}${conv.title}${C.reset} ${C.dim}is on ${conv.machine}${C.reset}\n`);
+    console.log(`  To continue it here, either:`);
+    console.log(`    - pull its context into a session here:  claude-chat-namer recap ${conv.uuid.slice(0, 8)} --all`);
+    console.log(`    - or move the whole conversation: on ${conv.machine} run`);
+    console.log(`        claude-chat-namer send ${conv.uuid.slice(0, 8)} --to ${here}`);
+    console.log(`      then here:  claude-chat-namer receive ${conv.uuid.slice(0, 8)}\n`);
+    return;
+  }
   const cmd = resumeCommand(conv);
 
   if (JSON_OUT) {
@@ -220,7 +253,7 @@ async function recapCmd(ref) {
   const conv = await pickOne(ref, "claude-chat-namer recap <uuid-prefix | query> [--all] [--turns n]");
   if (!conv) return;
   const turns = parseInt(flagValue("--turns"), 10) || 12;
-  const items = readRecap(conv.path, { turns });
+  const items = conv.remote ? readRemoteRecap(conv).slice(-turns * 2) : readRecap(conv.path, { turns });
 
   if (JSON_OUT) {
     console.log(JSON.stringify({ ...toJson(conv), recap: items }, null, 2));
@@ -228,9 +261,10 @@ async function recapCmd(ref) {
   }
   console.log(`# Recap: ${conv.title}`);
   console.log(`uuid: ${conv.uuid}`);
+  if (conv.remote) console.log(`machine: ${conv.machine} (secrets in this recap were redacted before it left that machine)`);
   if (conv.cwd) console.log(`directory: ${conv.cwd}`);
   console.log(`last activity: ${conv.lastModified.toISOString()}`);
-  console.log(`resume: ${resumeCommand(conv)}\n`);
+  console.log(conv.remote ? `resume: on ${conv.machine}, or move it here with send/receive\n` : `resume: ${resumeCommand(conv)}\n`);
   console.log(`## Last ${items.length} message(s)\n`);
   for (const it of items) {
     console.log(`### ${it.role === "user" ? "User" : "Claude"}${it.at ? ` (${it.at})` : ""}\n${it.text}\n`);
@@ -264,6 +298,108 @@ async function unnameCommand(projectPath, uuid) {
   console.log(
     `${C.green}  ✓ Removed name from "${match.uuid.substring(0, 8)}..."${C.reset}`
   );
+}
+
+// ─── Machines ───────────────────────────────────────────────────────────────
+
+async function syncCmd() {
+  const sub = positional[0] || "status";
+  if (sub === "init") {
+    const exclude = (flagValue("--exclude") || "").split(",").map((x) => x.trim()).filter(Boolean);
+    const config = initSync({ dir: flagValue("--dir"), machine: flagValue("--machine"), exclude });
+    const r = exportIndex({ force: true });
+    if (JSON_OUT) return console.log(JSON.stringify({ config, export: r }, null, 2));
+    console.log(`${C.green}  ✓ This machine is "${config.machine}", sharing through ${config.syncDir}${C.reset}`);
+    console.log(`${C.dim}  Exported ${r.conversations} conversation(s), ${r.recapsWritten} recap(s).${C.reset}`);
+    if (config.exclude.length) console.log(`${C.dim}  Not shared: projects matching ${config.exclude.join(", ")}${C.reset}`);
+    console.log(`\n  Keep that folder in sync between your machines (Syncthing, a cloud folder, git...).`);
+    return;
+  }
+  if (sub === "export") {
+    const r = exportIndex({ force: flag("--force") });
+    if (flag("--quiet")) return;
+    if (JSON_OUT) return console.log(JSON.stringify(r, null, 2));
+    console.log(`${C.green}  ✓ Exported ${r.conversations} conversation(s) as "${r.machine}" (${r.recapsWritten} recap(s) updated)${C.reset}`);
+    return;
+  }
+  if (sub === "map") {
+    const [, from, to] = positional;
+    if (!from || !to) return console.log(`${C.yellow}  Usage: claude-chat-namer sync map <path on the other machine> <path here>${C.reset}`);
+    const c = addPathMap(from, to);
+    return console.log(`${C.green}  ✓ ${from} → ${to}${C.reset} ${C.dim}(${c.pathMap.length} mapping(s))${C.reset}`);
+  }
+  // status
+  const config = loadConfig();
+  if (!config?.syncDir) {
+    if (JSON_OUT) return console.log(JSON.stringify({ configured: false }));
+    console.log(`${C.yellow}  Sync is not set up on this machine.${C.reset}`);
+    console.log(`  claude-chat-namer sync init --dir <folder that you keep in sync>`);
+    return;
+  }
+  const machines = listMachines();
+  if (JSON_OUT) return console.log(JSON.stringify({ configured: true, ...config, machines, sent: listSent() }, null, 2));
+  console.log(`  This machine: ${C.bold}${config.machine}${C.reset}`);
+  console.log(`  Sync folder:  ${config.syncDir}`);
+  if (config.exclude?.length) console.log(`  Not shared:   ${config.exclude.join(", ")}`);
+  for (const m of config.pathMap || []) console.log(`  Path map:     ${m.from} → ${m.to}`);
+  console.log(`\n  ${C.bold}Machines:${C.reset}`);
+  for (const m of machines) {
+    const when = m.exportedAt ? new Date(m.exportedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "never";
+    console.log(`    ${m.self ? "*" : " "} ${m.machine.padEnd(20)} ${String(m.conversations).padStart(4)} conversations  updated ${when}  ${C.dim}${m.platform || ""}${C.reset}`);
+  }
+  const sent = listSent();
+  if (sent.length) {
+    console.log(`\n  ${C.bold}Sent, waiting to be received:${C.reset}`);
+    for (const s of sent.slice(0, 10)) console.log(`    ${s.uuid.slice(0, 8)}  ${s.title}  ${C.dim}from ${s.from}${s.to ? ` to ${s.to}` : ""}${C.reset}`);
+  }
+  console.log();
+}
+
+async function sendCmd(ref) {
+  const conv = await pickOne(ref, "claude-chat-namer send <uuid-prefix | query> [--to machine]");
+  if (!conv) return;
+  const meta = sendConversation(conv, { to: flagValue("--to") || null });
+  if (JSON_OUT) return console.log(JSON.stringify(meta, null, 2));
+  console.log(`${C.green}  ✓ Sent "${meta.title}" to the sync folder${C.reset}`);
+  console.log(`  On ${meta.to || "the other machine"}, once the folder has synced:`);
+  console.log(`    claude-chat-namer receive ${meta.uuid.slice(0, 8)}\n`);
+}
+
+async function receiveCmd(ref) {
+  const sent = listSent();
+  if (!ref) {
+    if (JSON_OUT) return console.log(JSON.stringify(sent, null, 2));
+    if (!sent.length) return console.log(`${C.yellow}  Nothing has been sent yet (or the folder has not synced).${C.reset}`);
+    console.log(`${C.bold}  Conversations sent from other machines:${C.reset}\n`);
+    sent.forEach((s, i) =>
+      console.log(`  ${String(i + 1).padStart(3)}. ${s.title}\n       from ${s.from} | ${s.cwd} | ${s.uuid}`)
+    );
+    console.log(`\n${C.dim}  Install one with: claude-chat-namer receive <uuid-prefix> [--cwd <local folder>]${C.reset}\n`);
+    return;
+  }
+  const q = ref.toLowerCase();
+  const matches = sent.filter((s) => s.uuid.startsWith(ref) || (s.title || "").toLowerCase().includes(q));
+  if (matches.length !== 1) {
+    console.log(`${C.yellow}  ${matches.length ? "Several" : "No"} sent conversation(s) match "${ref}".${C.reset} Run receive without arguments to list them.`);
+    return;
+  }
+  const r = receiveConversation(matches[0], { cwd: flagValue("--cwd"), force: flag("--force") });
+  if (JSON_OUT) return console.log(JSON.stringify(r, null, 2));
+  console.log(`${C.green}  ✓ "${r.title}" from ${r.from} is now on this machine, in ${r.localCwd}${C.reset}`);
+  if (r.backup) console.log(`${C.dim}  The previous copy was kept as ${r.backup}${C.reset}`);
+  console.log(`\n  Resume it in a new terminal:\n    ${C.cyan}${r.resume}${C.reset}`);
+  console.log(`${C.dim}  Pull the project's latest code there first (git pull) so Claude sees the same files.${C.reset}\n`);
+}
+
+async function inboxCmd() {
+  const { dir, collected, files } = listInbox({ taildrop: !flag("--no-taildrop") });
+  const list = flag("--latest") ? files.slice(0, 1) : files.slice(0, LIMIT === Infinity ? 20 : LIMIT);
+  if (JSON_OUT) return console.log(JSON.stringify({ dir, collected, files: list }, null, 2));
+  if (collected) console.log(`${C.green}  ✓ Collected ${collected} file(s) sent with Taildrop${C.reset}`);
+  if (!files.length) return console.log(`${C.yellow}  The inbox is empty: ${dir}${C.reset}`);
+  for (const f of list) {
+    console.log(`  ${f.path}  ${C.dim}${(f.size / 1024).toFixed(0)} KB, ${f.modified.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}${C.reset}`);
+  }
 }
 
 // ─── Interactive mode ───────────────────────────────────────────────────────
@@ -480,6 +616,25 @@ async function main() {
         await recapCmd(positional.join(" "));
         break;
 
+      case "sync":
+        if (!JSON_OUT && !flag("--quiet")) header();
+        await syncCmd();
+        break;
+
+      case "send":
+        header();
+        await sendCmd(positional.join(" "));
+        break;
+
+      case "receive":
+        header();
+        await receiveCmd(positional.join(" "));
+        break;
+
+      case "inbox":
+        await inboxCmd();
+        break;
+
       case "auto":
       case "auto-name": {
         header();
@@ -518,11 +673,20 @@ async function main() {
           `    claude-chat-namer recap <uuid|query>    Print the last messages, to continue elsewhere`
         );
         console.log();
+        console.log(`${C.bold}  Across machines:${C.reset}`);
+        console.log(`    claude-chat-namer sync init --dir <folder>   Share through a folder you keep in sync`);
+        console.log(`    claude-chat-namer sync [status]              Machines, sent conversations, settings`);
+        console.log(`    claude-chat-namer sync map <there> <here>    Where a project lives on this machine`);
+        console.log(`    claude-chat-namer send <uuid|query>          Put a whole conversation in the folder`);
+        console.log(`    claude-chat-namer receive [<uuid|query>]     Install a sent one here, to resume it`);
+        console.log(`    claude-chat-namer inbox [--latest]           Files in the shared inbox (and Taildrop)`);
+        console.log();
         console.log(`${C.bold}  Options:${C.reset}`);
         console.log(
           `    --project <name>   Select project (default: current directory, else first found)`
         );
-        console.log(`    --all              Every project (list, search, resume, recap)`);
+        console.log(`    --all              Every project, and other machines once sync is set up`);
+        console.log(`    --local            With --all: only this machine`);
         console.log(`    --limit <n>        Show at most n results (default 40 with --all)`);
         console.log(`    --json             Machine-readable output (list, search, resume, recap)`);
         console.log(`    --print            resume: only print the command, do not launch`);

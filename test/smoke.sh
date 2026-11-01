@@ -226,4 +226,129 @@ echo '{"version":2,"files":{' > "$HOME/.claude/chat-namer/cache.json"
 out="$($CLI list --all)"
 assert_contains "6 conversation(s)" "$out"
 
+# ─── v1.2: machines (two fake HOMEs sharing one sync folder) ────────────────
+
+SYNC="$(mktemp -d)"
+HB="$(mktemp -d)"
+trap 'rm -rf "$HOME" "$SYNC" "$HB"' EXIT
+onB() { HOME="$HB" "$@"; }
+
+# a secret-looking message and an excluded project on machine A
+SECRET="$HOME/.claude/projects/-home-user-secretproj"
+mkdir -p "$SECRET"
+U7=77777777-7777-4777-8777-777777777777
+U8=88888888-8888-4888-8888-888888888888
+cat > "$OTHER/$U7.jsonl" <<JSONL
+{"parentUuid":null,"isSidechain":false,"cwd":"/home/user/other","sessionId":"$U7","type":"user","message":{"role":"user","content":"deploy with key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv and password=hunter2hunter2, refresh 1//0gAbCdEfGhIjKlMnOpQrStUvWx, raw AbCdEf1234567890GhIjKlMnOpQrStUv99"},"uuid":"77777777-0000-4000-8000-000000000001","timestamp":"2026-09-03T08:00:00.000Z"}
+{"parentUuid":"77777777-0000-4000-8000-000000000001","isSidechain":false,"cwd":"/home/user/other","sessionId":"$U7","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Deployed the pelican service."}]},"uuid":"77777777-0000-4000-8000-000000000002","timestamp":"2026-09-03T08:00:05.000Z"}
+JSONL
+cat > "$SECRET/$U8.jsonl" <<JSONL
+{"parentUuid":null,"isSidechain":false,"cwd":"/home/user/secretproj","sessionId":"$U8","type":"user","message":{"role":"user","content":"client payroll walrus"},"uuid":"88888888-0000-4000-8000-000000000001","timestamp":"2026-09-03T09:00:00.000Z"}
+{"parentUuid":"88888888-0000-4000-8000-000000000001","isSidechain":false,"cwd":"/home/user/secretproj","sessionId":"$U8","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]},"uuid":"88888888-0000-4000-8000-000000000002","timestamp":"2026-09-03T09:00:05.000Z"}
+JSONL
+mkdir -p "$OTHER/$U5/subagents"
+echo "{\"type\":\"user\",\"isSidechain\":true,\"cwd\":\"/home/user/other\",\"message\":{\"content\":\"sub\"}}" > "$OTHER/$U5/subagents/agent-1.jsonl"
+
+echo "- sync init"
+out="$($CLI sync init --dir "$SYNC" --machine laptop --exclude secretproj)"
+assert_contains 'This machine is "laptop"' "$out"
+assert_contains "Not shared: projects matching secretproj" "$out"
+[ -f "$SYNC/machines/laptop/index.json" ] || fail "no index exported"
+grep -q walrus "$SYNC/machines/laptop/index.json" && fail "excluded project was exported"
+grep -rq "sk-ant-api03" "$SYNC/machines/laptop" && fail "secret leaked into the shared index"
+grep -rq "hunter2" "$SYNC/machines/laptop" && fail "password leaked into the shared index"
+grep -rq "1//0gAbCd" "$SYNC/machines/laptop" && fail "Google token leaked into the shared index"
+grep -rq "AbCdEf1234567890" "$SYNC/machines/laptop" && fail "long random token leaked into the shared index"
+grep -q "pelican" "$SYNC/machines/laptop/recaps/$U7.json" || fail "recap not exported"
+
+mkdir -p "$HB/.claude/projects/-srv-api"
+U9=99999999-9999-4999-8999-999999999999
+cat > "$HB/.claude/projects/-srv-api/$U9.jsonl" <<JSONL
+{"parentUuid":null,"isSidechain":false,"cwd":"/srv/api","sessionId":"$U9","type":"user","message":{"role":"user","content":"tune the nginx cache"},"uuid":"99999999-0000-4000-8000-000000000001","timestamp":"2026-09-04T08:00:00.000Z"}
+{"parentUuid":"99999999-0000-4000-8000-000000000001","isSidechain":false,"cwd":"/srv/api","sessionId":"$U9","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done."}]},"uuid":"99999999-0000-4000-8000-000000000002","timestamp":"2026-09-04T08:00:05.000Z"}
+JSONL
+onB $CLI sync init --dir "$SYNC" --machine server > /dev/null
+
+echo "- sync status"
+out="$(onB $CLI sync status)"
+assert_contains "This machine: server" "$out"
+assert_contains "laptop" "$out"
+
+echo "- search and recap across machines"
+out="$(onB $CLI search stripe signature --all)"
+assert_contains "[laptop] [renamed] Stripe billing" "$out"
+out="$(onB $CLI search nginx --all)"
+assert_contains "tune the nginx cache" "$out"
+assert_not_contains "[laptop]" "$out"
+out="$(onB $CLI search stripe --all --local)"
+assert_contains "No conversations matching" "$out"
+out="$(onB $CLI search walrus --all)"
+assert_contains "No conversations matching" "$out"
+out="$(onB $CLI recap deploy --all)"
+assert_contains "machine: laptop" "$out"
+assert_contains "Deployed the pelican service." "$out"
+assert_contains "[redacted]" "$out"
+assert_not_contains "hunter2" "$out"
+out="$(onB $CLI resume eeee --all --print)"
+assert_contains "is on laptop" "$out"
+assert_contains "claude-chat-namer send eeeeeeee --to server" "$out"
+
+echo "- send / receive"
+out="$($CLI send eeee --all --to server)"
+assert_contains 'Sent "Stripe billing"' "$out"
+[ -f "$SYNC/sent/$U5/files/subagents/agent-1.jsonl" ] || fail "subagent transcripts not sent"
+out="$(onB $CLI receive)"
+assert_contains "Stripe billing" "$out"
+out="$(onB $CLI receive eeee 2>&1 || true)"
+assert_contains "Where is this project on this machine?" "$out"
+out="$(onB $CLI receive eeee --cwd /srv/shop)"
+assert_contains "now on this machine, in /srv/shop" "$out"
+assert_contains "cd /srv/shop && claude --resume $U5" "$out"
+DST="$HB/.claude/projects/-srv-shop/$U5.jsonl"
+[ -f "$DST" ] || fail "transcript not installed"
+grep -q '"cwd":"/home/user/other"' "$DST" && fail "cwd not rewritten"
+grep -q '"cwd":"/srv/shop"' "$DST" || fail "cwd not set"
+grep -q '"cwd":"/srv/shop"' "$HB/.claude/projects/-srv-shop/$U5/subagents/agent-1.jsonl" || fail "subagent cwd not rewritten"
+grep -q 'agentName' "$DST" || fail "non-cwd lines lost"
+out="$(onB $CLI list --project srv-shop)"
+assert_contains "[renamed] Stripe billing" "$out"
+out="$(onB $CLI receive eeee --cwd /srv/shop 2>&1 || true)"
+assert_contains "already has that conversation" "$out"
+out="$(onB $CLI receive eeee --cwd /srv/shop --force)"
+assert_contains "previous copy was kept" "$out"
+
+echo "- path map"
+onB $CLI sync map /home/user/other /srv/other > /dev/null
+rm -f "$HB/.claude/projects/-srv-other/$U5.jsonl"
+out="$(onB $CLI receive eeee)"
+assert_contains "in /srv/other" "$out"
+node --input-type=module -e "
+  import { mapPath } from '$ROOT/scripts/sync.js';
+  import { resumeCommand } from '$ROOT/scripts/index.js';
+  const m = [{ from: '/root/HoReCaOS', to: 'C:\\\\code\\\\HoReCaOS' }, { from: 'C:\\\\Users\\\\me\\\\shop', to: '/srv/shop' }];
+  const a = mapPath('/root/HoReCaOS/apps/web', m);
+  const b = mapPath('C:\\\\Users\\\\me\\\\shop\\\\api', m);
+  const r = resumeCommand({ uuid: 'u1', cwd: 'C:\\\\code\\\\HoReCaOS' });
+  if (a !== 'C:\\\\code\\\\HoReCaOS\\\\apps\\\\web' || b !== '/srv/shop/api' || r !== 'cd \"C:\\\\code\\\\HoReCaOS\"; claude --resume u1') {
+    console.error(JSON.stringify({ a, b, r })); process.exit(1);
+  }" || fail "path mapping"
+
+echo "- inbox"
+printf 'png' > "$SYNC/inbox/shot-1.png"; sleep 1; printf 'png2' > "$SYNC/inbox/shot-2.png"
+out="$(onB $CLI inbox --latest --no-taildrop)"
+assert_contains "$SYNC/inbox/shot-2.png" "$out"
+assert_not_contains "shot-1.png" "$out"
+
+echo "- Stop hook refreshes the shared index"
+before="$(grep -o '"exportedAt":"[^"]*"' "$SYNC/machines/laptop/index.json")"
+rm -f "$HOME/.claude/chat-namer/export-state.json"
+sleep 1
+hook "{\"transcript_path\":\"$PROJ/$U1.jsonl\",\"hook_event_name\":\"Stop\"}" > /dev/null
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  after="$(grep -o '"exportedAt":"[^"]*"' "$SYNC/machines/laptop/index.json")"
+  [ "$after" != "$before" ] && break
+  sleep 0.5
+done
+[ "$after" != "$before" ] || fail "hook did not refresh the index"
+
 echo "OK: all smoke tests passed"

@@ -5,7 +5,31 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2026-11-01
+## [1.2.0] - 2026-11-01
+
+### Added
+
+- **Across machines.** Point chat-namer at a folder you keep in sync between
+  your machines (Syncthing over Tailscale, a cloud folder, Syncthing, git)
+  with `sync init --dir <folder>`. Each machine shares a small index of its
+  conversations; `--all` then searches and recaps conversations from every
+  machine, tagged with the machine name. The Stop hook refreshes the index
+  in the background, at most every 2 minutes.
+- Secrets are redacted before anything leaves a machine (API keys, tokens,
+  JWTs, Google OAuth tokens, private keys, passwords, credentials in URLs,
+  long random strings), and `--exclude` keeps whole projects private.
+- **`send` / `receive`** (experimental): move a whole conversation to
+  another machine and resume it there with `claude --resume`. The working
+  directory is rewritten for the other machine (`sync map` remembers where
+  each project lives); an existing copy is only replaced with `--force`,
+  and kept as a backup.
+- **`inbox`**: files and screenshots from another device, through the
+  shared folder or Tailscale's Taildrop ("Send with Tailscale"). No `scp`.
+- Skills `sync-setup` (Claude installs and configures the transport, with
+  your approval), `move` and `inbox`.
+- The resume command uses PowerShell syntax for Windows paths.
+
+
 
 ### Added
 

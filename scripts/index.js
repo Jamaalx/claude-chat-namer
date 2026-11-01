@@ -16,7 +16,7 @@ import { createInterface } from "readline";
 import { fileURLToPath } from "url";
 
 // Claude Code honours CLAUDE_CONFIG_DIR, so do we.
-const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+export const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 export const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
 const NAMES_FILE = "chat-names.json";
 const CACHE_DIR = join(CLAUDE_DIR, "chat-namer");
@@ -476,9 +476,11 @@ export function autoNameAll(projectPath) {
 
 // ─── Resume / recap ─────────────────────────────────────────────────────────
 
-function shellQuote(s) {
+export function shellQuote(s) {
   return /^[A-Za-z0-9_./:@%+=,-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
 }
+
+const isWindowsPath = (p) => /^[A-Za-z]:[\\/]/.test(p);
 
 /**
  * `claude --resume` only finds a session from the directory it was started
@@ -486,7 +488,10 @@ function shellQuote(s) {
  */
 export function resumeCommand(conv) {
   const resume = `claude --resume ${conv.uuid}`;
-  return conv.cwd ? `cd ${shellQuote(conv.cwd)} && ${resume}` : resume;
+  if (!conv.cwd) return resume;
+  // PowerShell (the usual Windows shell for Claude Code) has no reliable &&.
+  if (isWindowsPath(conv.cwd)) return `cd "${conv.cwd}"; ${resume}`;
+  return `cd ${shellQuote(conv.cwd)} && ${resume}`;
 }
 
 /**
@@ -549,7 +554,7 @@ export function readRecap(filePath, { turns = 12, maxChars = 12000 } = {}) {
  * incremental re-read never sees half a line (Claude Code always ends lines
  * with "\n"; a dangling tail is a line still being written).
  */
-function scanLines(filePath, onLine, start = 0) {
+export function scanLines(filePath, onLine, start = 0) {
   const fd = openSync(filePath, "r");
   const CHUNK = 1 << 20;
   const buf = Buffer.alloc(CHUNK);
@@ -602,8 +607,9 @@ export function formatConversation(conv, index, { showProject = false } = {}) {
   const sizeKb = (conv.size / 1024).toFixed(0);
   const tag = TAGS[conv.source] || TAGS.auto;
   const where = showProject ? ` | ${conv.cwd || conv.project}` : "";
+  const machine = conv.machine ? `\x1b[35m[${conv.machine}]\x1b[0m ` : "";
 
-  let out = `  ${String(index + 1).padStart(3)}. ${tag} ${conv.title}\n       ${date} | ${conv.messageCount} msgs | ${sizeKb} KB${where} | ${conv.uuid}`;
+  let out = `  ${String(index + 1).padStart(3)}. ${machine}${tag} ${conv.title}\n       ${date} | ${conv.messageCount} msgs | ${sizeKb} KB${where} | ${conv.uuid}`;
   if (conv.snippet) out += `\n       \x1b[90m"${conv.snippet}"\x1b[0m`;
   return out;
 }

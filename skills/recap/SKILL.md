@@ -10,7 +10,7 @@ The user wants to continue, here, something from an earlier conversation. Use th
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" recap "<keywords or uuid>" --all
 ```
-It prints the last exchanges of that conversation (the user's messages and Claude's answers, no tool output). If several conversations match, it lists them instead: ask which one and run it again with that UUID. Use `--turns <n>` (default 12) for more or less history. If it says no Claude Code transcripts were found, use path B.
+It prints the last exchanges of that conversation (the user's messages and Claude's answers, no tool output). With sync set up this also works for conversations on the user's other machines; their recaps had secrets redacted before leaving that machine. If several conversations match, it lists them instead: ask which one and run it again with that UUID. Use `--turns <n>` (default 12) for more or less history. If it says no Claude Code transcripts were found, use path B.
 
 ## B. Claude.ai and other Claude apps
 

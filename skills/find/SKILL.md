@@ -19,6 +19,8 @@ Pick 2–4 short keywords from the user's words; if nothing matches, retry once 
 
 Reply with a short numbered list: title, date, directory, and for content matches the snippet. When one result clearly fits, give its `resume` field as the command to run in a new terminal, exactly as printed (it starts with `cd`, because `claude --resume` only works from the session's directory). If they would rather continue here, offer to recap it (the `recap` skill).
 
+When sync between machines is set up, `--all` also returns conversations from the user's other machines; those have a `machine` field and no `resume` command. Say which machine each one is on, and offer either a recap here (works right away) or moving the whole conversation (the `move` skill).
+
 If the command says no Claude Code transcripts were found, use path B.
 
 ## B. Claude.ai and other Claude apps
