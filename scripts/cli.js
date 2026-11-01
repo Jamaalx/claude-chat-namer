@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { existsSync } from "fs";
 import {
   getProjects,
   findProjectForDir,
@@ -7,11 +8,16 @@ import {
   nameConversation,
   unnameConversation,
   searchConversations,
+  getAllConversations,
+  findConversations,
+  resumeCommand,
+  readRecap,
   autoNameAll,
   formatConversation,
   createPrompt,
   ask,
   VERSION,
+  PROJECTS_DIR,
 } from "./index.js";
 
 const args = process.argv.slice(2);
@@ -19,14 +25,24 @@ const command = args[0] || "interactive";
 
 // Positional arguments: everything after the command that is not a flag
 // (and not the value of --project).
+const VALUE_FLAGS = new Set(["--project", "--limit", "--turns"]);
 const positional = [];
 for (let i = 1; i < args.length; i++) {
-  if (args[i] === "--project") {
+  if (VALUE_FLAGS.has(args[i])) {
     i++; // skip its value
   } else if (!args[i].startsWith("--")) {
     positional.push(args[i]);
   }
 }
+
+const flag = (f) => args.includes(f);
+const flagValue = (f) => {
+  const i = args.indexOf(f);
+  return i !== -1 ? args[i + 1] : undefined;
+};
+const ALL = flag("--all");
+const JSON_OUT = flag("--json");
+const LIMIT = parseInt(flagValue("--limit"), 10) || (ALL ? 40 : Infinity);
 
 // Colors
 const C = {
@@ -40,7 +56,14 @@ const C = {
   magenta: "\x1b[35m",
 };
 
+const NO_TRANSCRIPTS =
+  `${C.yellow}  No Claude Code transcripts found in ${PROJECTS_DIR}.${C.reset}\n` +
+  `${C.dim}  chat-namer reads the conversations Claude Code keeps on this machine, so it\n` +
+  `  works in Claude Code (terminal, desktop app, IDE). In claude.ai chats there are\n` +
+  `  no local transcripts to read.${C.reset}`;
+
 function header() {
+  if (JSON_OUT) return;
   console.log(
     `\n${C.cyan}${C.bold}  Claude Chat Namer${C.reset} ${C.dim}v${VERSION}${C.reset}`
   );
@@ -51,21 +74,54 @@ function header() {
 
 // ─── Commands ───────────────────────────────────────────────────────────────
 
-async function listCommand(projectPath) {
-  const conversations = getConversations(projectPath);
+function toJson(conv) {
+  return {
+    uuid: conv.uuid,
+    title: conv.title,
+    source: conv.source,
+    cwd: conv.cwd,
+    project: conv.project,
+    messages: conv.messageCount,
+    lastModified: conv.lastModified.toISOString(),
+    sizeKb: Math.round(conv.size / 1024),
+    resume: resumeCommand(conv),
+    ...(conv.match ? { match: conv.match } : {}),
+    ...(conv.snippet ? { snippet: conv.snippet } : {}),
+  };
+}
+
+function printConversations(list, heading) {
+  const shown = list.slice(0, LIMIT);
+  if (JSON_OUT) {
+    console.log(JSON.stringify(shown.map(toJson), null, 2));
+    return;
+  }
+  console.log(`${C.bold}  ${heading}${C.reset}\n`);
+  shown.forEach((conv, i) => {
+    console.log(formatConversation(conv, i, { showProject: ALL }));
+  });
+  if (list.length > shown.length) {
+    console.log(`\n${C.dim}  ... ${list.length - shown.length} more (use --limit <n>)${C.reset}`);
+  }
+  console.log();
+}
+
+// --all → every project; otherwise the selected one.
+async function loadConversations() {
+  if (ALL) return getAllConversations();
+  return getConversations(await selectProject());
+}
+
+async function listCommand() {
+  const conversations = await loadConversations();
 
   if (conversations.length === 0) {
-    console.log(`${C.yellow}  No conversations found.${C.reset}`);
+    if (JSON_OUT) console.log("[]");
+    else console.log(`${C.yellow}  No conversations found.${C.reset}`);
     return;
   }
 
-  console.log(
-    `${C.bold}  ${conversations.length} conversation(s):${C.reset}\n`
-  );
-  conversations.forEach((conv, i) => {
-    console.log(formatConversation(conv, i));
-  });
-  console.log();
+  printConversations(conversations, `${conversations.length} conversation(s)${ALL ? " in all projects" : ""}:`);
 }
 
 async function nameCommand(projectPath, uuid, name) {
@@ -90,30 +146,95 @@ async function nameCommand(projectPath, uuid, name) {
   );
 }
 
-async function searchCommand(projectPath, query) {
+async function searchCommand(query) {
   if (!query) {
     console.log(
-      `${C.yellow}  Usage: claude-chat-namer search <query>${C.reset}`
+      `${C.yellow}  Usage: claude-chat-namer search <query> [--all]${C.reset}`
     );
     return;
   }
 
-  const results = searchConversations(projectPath, query);
+  const results = searchConversations(await loadConversations(), query);
 
   if (results.length === 0) {
-    console.log(
-      `${C.yellow}  No conversations matching "${query}"${C.reset}`
-    );
+    if (JSON_OUT) console.log("[]");
+    else console.log(`${C.yellow}  No conversations matching "${query}"${C.reset}`);
     return;
   }
 
-  console.log(
-    `${C.bold}  ${results.length} result(s) for "${query}":${C.reset}\n`
-  );
-  results.forEach((conv, i) => {
-    console.log(formatConversation(conv, i));
+  printConversations(results, `${results.length} result(s) for "${query}":`);
+}
+
+// Pick one conversation from a UUID prefix or a query; print the choices
+// when it is ambiguous.
+async function pickOne(ref, usage) {
+  if (!ref) {
+    console.log(`${C.yellow}  Usage: ${usage}${C.reset}`);
+    return null;
+  }
+  const matches = findConversations(await loadConversations(), ref);
+  if (matches.length === 0) {
+    console.log(`${C.yellow}  No conversation matching "${ref}"${C.reset}`);
+    return null;
+  }
+  if (matches.length > 1 && !matches[0].uuid.startsWith(ref)) {
+    // Several search hits: take the best one only if it is clearly best.
+    const titleHits = matches.filter((m) => m.match === "title");
+    if (titleHits.length !== 1) {
+      printConversations(matches, `${matches.length} conversations match "${ref}", pick one by UUID:`);
+      return null;
+    }
+    return titleHits[0];
+  }
+  return matches[0];
+}
+
+async function resumeCmd(ref) {
+  const conv = await pickOne(ref, "claude-chat-namer resume <uuid-prefix | query> [--all] [--print]");
+  if (!conv) return;
+  const cmd = resumeCommand(conv);
+
+  if (JSON_OUT) {
+    console.log(JSON.stringify(toJson(conv), null, 2));
+    return;
+  }
+  // Inside Claude Code (or with --print) we can only show the command.
+  if (flag("--print") || process.env.CLAUDECODE || !process.stdout.isTTY) {
+    console.log(`  ${C.bold}${conv.title}${C.reset}\n`);
+    console.log(`  Run in a new terminal:\n    ${C.cyan}${cmd}${C.reset}\n`);
+    return;
+  }
+  console.log(`${C.dim}  Resuming "${conv.title}" in ${conv.cwd || "the current directory"}...${C.reset}\n`);
+  const { spawn } = await import("child_process");
+  const child = spawn("claude", ["--resume", conv.uuid], {
+    cwd: conv.cwd && existsSync(conv.cwd) ? conv.cwd : process.cwd(),
+    stdio: "inherit",
   });
-  console.log();
+  child.on("error", () => {
+    console.log(`${C.yellow}  Could not start claude. Run:${C.reset}\n    ${cmd}`);
+  });
+  child.on("exit", (code) => process.exit(code ?? 0));
+}
+
+async function recapCmd(ref) {
+  const conv = await pickOne(ref, "claude-chat-namer recap <uuid-prefix | query> [--all] [--turns n]");
+  if (!conv) return;
+  const turns = parseInt(flagValue("--turns"), 10) || 12;
+  const items = readRecap(conv.path, { turns });
+
+  if (JSON_OUT) {
+    console.log(JSON.stringify({ ...toJson(conv), recap: items }, null, 2));
+    return;
+  }
+  console.log(`# Recap: ${conv.title}`);
+  console.log(`uuid: ${conv.uuid}`);
+  if (conv.cwd) console.log(`directory: ${conv.cwd}`);
+  console.log(`last activity: ${conv.lastModified.toISOString()}`);
+  console.log(`resume: ${resumeCommand(conv)}\n`);
+  console.log(`## Last ${items.length} message(s)\n`);
+  for (const it of items) {
+    console.log(`### ${it.role === "user" ? "User" : "Claude"}${it.at ? ` (${it.at})` : ""}\n${it.text}\n`);
+  }
 }
 
 async function autoNameCommand(projectPath) {
@@ -152,7 +273,7 @@ async function interactiveMode() {
 
   const projects = getProjects();
   if (projects.length === 0) {
-    console.log(`${C.yellow}  No Claude Code projects found.${C.reset}`);
+    console.log(NO_TRANSCRIPTS);
     process.exit(0);
   }
 
@@ -246,7 +367,7 @@ async function interactiveMode() {
     if (!isNaN(num) && num >= 1 && num <= shown.length) {
       const conv = shown[num - 1];
       console.log(
-        `\n  ${C.dim}Current: ${conv.name || conv.autoName}${C.reset}`
+        `\n  ${C.dim}Current: ${conv.title}${C.reset}`
       );
       console.log(
         `  ${C.dim}UUID: ${conv.uuid}${C.reset}`
@@ -284,7 +405,7 @@ async function interactiveMode() {
 async function selectProject() {
   const projects = getProjects();
   if (projects.length === 0) {
-    console.log(`${C.yellow}  No Claude Code projects found.${C.reset}`);
+    console.log(NO_TRANSCRIPTS);
     process.exit(0);
   }
 
@@ -320,8 +441,7 @@ async function main() {
       case "list":
       case "ls": {
         header();
-        const p = await selectProject();
-        await listCommand(p);
+        await listCommand();
         break;
       }
 
@@ -345,10 +465,20 @@ async function main() {
       case "search":
       case "find": {
         header();
-        const p = await selectProject();
-        await searchCommand(p, positional.join(" "));
+        await searchCommand(positional.join(" "));
         break;
       }
+
+      case "resume":
+      case "open": {
+        header();
+        await resumeCmd(positional.join(" "));
+        break;
+      }
+
+      case "recap":
+        await recapCmd(positional.join(" "));
+        break;
 
       case "auto":
       case "auto-name": {
@@ -381,11 +511,22 @@ async function main() {
         console.log(
           `    claude-chat-namer auto                  Auto-name all unnamed`
         );
+        console.log(
+          `    claude-chat-namer resume <uuid|query>   Jump back into a conversation (right directory)`
+        );
+        console.log(
+          `    claude-chat-namer recap <uuid|query>    Print the last messages, to continue elsewhere`
+        );
         console.log();
         console.log(`${C.bold}  Options:${C.reset}`);
         console.log(
           `    --project <name>   Select project (default: current directory, else first found)`
         );
+        console.log(`    --all              Every project (list, search, resume, recap)`);
+        console.log(`    --limit <n>        Show at most n results (default 40 with --all)`);
+        console.log(`    --json             Machine-readable output (list, search, resume, recap)`);
+        console.log(`    --print            resume: only print the command, do not launch`);
+        console.log(`    --turns <n>        recap: how many exchanges (default 12)`);
         console.log();
         break;
 

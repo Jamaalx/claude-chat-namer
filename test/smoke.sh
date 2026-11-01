@@ -66,7 +66,7 @@ out="$($CLI list --project demo)"
 assert_contains "4 conversation(s)" "$out"
 assert_contains "[auto] Help me fix the wolt integration timeout bug in the order..." "$out"
 assert_contains "3 msgs" "$out"
-assert_contains "[auto] Refactor the auth middleware to use the new session helper" "$out"
+assert_contains "[summary] Refactor auth middleware" "$out"   # compaction summary beats the first message
 assert_contains "[auto] Empty conversation" "$out"
 assert_contains "[auto] Add a CHANGELOG to the repo" "$out"   # slash-command lines are skipped
 assert_not_contains "Caveat" "$out"
@@ -80,7 +80,7 @@ assert_contains "No conversations found." "$(CLAUDE_PROJECT_DIR=/home/user/empty
 assert_contains "4 conversation(s)" "$(CLAUDE_PROJECT_DIR=/home/user/demo/src/deep $CLI list)"
 
 echo "- list (no ~/.claude at all)"
-assert_contains "No Claude Code projects found." "$(HOME=$(mktemp -d) $CLI list)"
+assert_contains "No Claude Code transcripts found" "$(HOME=$(mktemp -d) $CLI list)"
 
 echo "- search"
 out="$($CLI search wolt --project demo)"
@@ -137,5 +137,93 @@ for payload in \
 done
 # the empty transcript must not get a name
 grep -q "$U3" "$PROJ/chat-names.json" && fail "hook named an empty transcript"
+
+# ─── v1.1: native titles, --all, full-text search, resume, recap, cache ─────
+
+OTHER="$HOME/.claude/projects/-home-user-other"
+mkdir -p "$OTHER"
+U5=eeeeeeee-5555-4555-8555-555555555555 # ai-title, then /rename (agent-name)
+U6=ffffffff-6666-4666-8666-666666666666 # ai-title only, path with a space
+cat > "$OTHER/$U5.jsonl" <<JSONL
+{"parentUuid":null,"isSidechain":false,"cwd":"/home/user/other","sessionId":"$U5","type":"user","message":{"role":"user","content":"Set up the billing webhook"},"uuid":"55555555-0000-4000-8000-000000000001","timestamp":"2026-09-01T08:00:00.000Z"}
+{"parentUuid":"55555555-0000-4000-8000-000000000001","isSidechain":false,"cwd":"/home/user/other","sessionId":"$U5","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Webhook ready."}]},"uuid":"55555555-0000-4000-8000-000000000002","timestamp":"2026-09-01T08:00:05.000Z"}
+{"type":"ai-title","aiTitle":"Billing webhook setup","sessionId":"$U5"}
+{"parentUuid":"55555555-0000-4000-8000-000000000002","isSidechain":false,"cwd":"/home/user/other","sessionId":"$U5","type":"user","message":{"role":"user","content":"now verify the stripe signature header"},"uuid":"55555555-0000-4000-8000-000000000003","timestamp":"2026-09-01T08:02:00.000Z"}
+{"parentUuid":"55555555-0000-4000-8000-000000000003","isSidechain":true,"cwd":"/home/user/other","sessionId":"$U5","type":"user","message":{"role":"user","content":"subagent secret marmalade"},"uuid":"55555555-0000-4000-8000-000000000004","timestamp":"2026-09-01T08:02:01.000Z"}
+{"parentUuid":"55555555-0000-4000-8000-000000000003","isSidechain":false,"cwd":"/home/user/other","sessionId":"$U5","type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"echo '{\\"type\\":\\"user\\"}'"}}]},"uuid":"55555555-0000-4000-8000-000000000005","timestamp":"2026-09-01T08:02:05.000Z"}
+{"type":"agent-name","agentName":"Stripe billing","sessionId":"$U5"}
+JSONL
+cat > "$OTHER/$U6.jsonl" <<JSONL
+{"parentUuid":null,"isSidechain":false,"cwd":"/home/user/my app's dir","sessionId":"$U6","type":"user","message":{"role":"user","content":"Write the landing page copy"},"uuid":"66666666-0000-4000-8000-000000000001","timestamp":"2026-09-02T08:00:00.000Z"}
+{"parentUuid":"66666666-0000-4000-8000-000000000001","isSidechain":false,"cwd":"/home/user/my app's dir","sessionId":"$U6","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Here is a draft."}]},"uuid":"66666666-0000-4000-8000-000000000002","timestamp":"2026-09-02T08:00:05.000Z"}
+{"type":"ai-title","aiTitle":"Landing page copy","sessionId":"$U6"}
+JSONL
+
+echo "- native titles"
+out="$($CLI list --project other)"
+assert_contains "[renamed] Stripe billing" "$out"            # /rename beats ai-title
+assert_contains "[ai] Landing page copy" "$out"
+assert_contains "4 msgs" "$out"                               # sidechain + tool_use JSON not miscounted
+$CLI name ffff "My landing" --project other > /dev/null
+out="$($CLI list --project other)"
+assert_contains "[named] My landing" "$out"                   # user name beats ai-title
+assert_contains "[renamed] Stripe billing" "$out"
+
+echo "- --all"
+out="$($CLI list --all)"
+assert_contains "6 conversation(s) in all projects" "$out"
+assert_contains "/home/user/other" "$out"
+out="$($CLI list --all --limit 2)"
+assert_contains "4 more (use --limit <n>)" "$out"
+
+echo "- full-text search"
+out="$($CLI search stripe signature --all)"
+assert_contains "1 result(s)" "$out"
+assert_contains "Stripe billing" "$out"
+out="$($CLI search signature header --all)"
+assert_contains "verify the stripe signature header" "$out"   # snippet of a later message
+out="$($CLI search marmalade --all)"
+assert_contains "No conversations matching" "$out"           # subagent text is not searched
+out="$($CLI search "src/sync.ts" --all)"
+assert_contains "Help me fix the wolt" "$out"
+
+echo "- resume"
+out="$($CLI resume eeee --all --print)"
+assert_contains "cd /home/user/other && claude --resume $U5" "$out"
+out="$($CLI resume ffff --all --print)"
+assert_contains "cd '/home/user/my app'\\''s dir' && claude --resume $U6" "$out"
+out="$($CLI resume "landing" --all --print)"
+assert_contains "claude --resume $U6" "$out"
+
+echo "- json"
+$CLI search billing --all --json | node -e '
+  const r = JSON.parse(require("fs").readFileSync(0, "utf-8"));
+  if (r.length !== 1 || r[0].title !== "Stripe billing" || r[0].source !== "renamed" || !r[0].resume.startsWith("cd /home/user/other")) {
+    console.error(JSON.stringify(r)); process.exit(1);
+  }' || fail "json output"
+
+echo "- recap"
+out="$($CLI recap eeee --all --turns 2)"
+assert_contains "# Recap: Stripe billing" "$out"
+assert_contains "now verify the stripe signature header" "$out"
+assert_not_contains "marmalade" "$out"
+
+echo "- cache picks up appended lines"
+cat >> "$OTHER/$U6.jsonl" <<JSONL
+{"parentUuid":"66666666-0000-4000-8000-000000000002","isSidechain":false,"cwd":"/home/user/my app's dir","sessionId":"$U6","type":"user","message":{"role":"user","content":"add a pricing table with quokka plans"},"uuid":"66666666-0000-4000-8000-000000000003","timestamp":"2026-09-02T08:03:00.000Z"}
+{"type":"ai-title","aiTitle":"Landing page and pricing","sessionId":"$U6"}
+JSONL
+out="$($CLI search quokka --all)"
+assert_contains "1 result(s)" "$out"
+$CLI unname ffff --project other > /dev/null
+out="$($CLI list --project other)"
+assert_contains "[ai] Landing page and pricing" "$out"
+assert_contains "3 msgs" "$out"
+[ -f "$HOME/.claude/chat-namer/cache.json" ] || fail "cache not written"
+
+echo "- truncated cache file is ignored"
+echo '{"version":2,"files":{' > "$HOME/.claude/chat-namer/cache.json"
+out="$($CLI list --all)"
+assert_contains "6 conversation(s)" "$out"
 
 echo "OK: all smoke tests passed"

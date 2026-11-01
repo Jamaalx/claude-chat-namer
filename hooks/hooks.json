@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hook-auto-name.js",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-auto-name.js\"",
             "timeout": 10,
             "async": true
           }

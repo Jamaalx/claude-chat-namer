@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="chat-namer">
+  <rect width="512" height="512" rx="112" fill="#1F2A44"/>
+  <path d="M112 152c0-22 18-40 40-40h208c22 0 40 18 40 40v152c0 22-18 40-40 40H232l-72 56v-56h-8c-22 0-40-18-40-40z" fill="none" stroke="#F5F1E8" stroke-width="28" stroke-linejoin="round"/>
+  <path d="M184 196h84l44 32-44 32h-84z" fill="#E8915B" stroke="#E8915B" stroke-width="12" stroke-linejoin="round"/>
+  <circle cx="212" cy="228" r="10" fill="#1F2A44"/>
+</svg>

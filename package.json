@@ -1,6 +1,6 @@
 {
   "name": "claude-chat-namer",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Claude Code plugin: name, search, and resume your conversations. No more UUID chaos.",
   "main": "scripts/index.js",
   "bin": {
@@ -37,6 +37,7 @@
   },
   "files": [
     ".claude-plugin/",
+    "assets/",
     "scripts/",
     "skills/",
     "hooks/",

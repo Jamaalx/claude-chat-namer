@@ -5,9 +5,42 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-11-01
 
-Maintenance pass of 2026-09-24.
+### Added
+
+- **Native titles.** Claude Code now titles conversations itself (`ai-title`)
+  and `/rename` stores your own title in the transcript. chat-namer shows
+  them, in this order: `/rename` > your chat-namer name > Claude's title >
+  compaction summary > first message. The tag says which one you see:
+  `[renamed]`, `[named]`, `[ai]`, `[summary]`, `[auto]`.
+- **`--all`** for `list`, `search`, `resume` and `recap`: every project at
+  once, newest first, with the directory of each conversation
+  (`--limit <n>`, default 40).
+- **Full-text search.** `search` looks at everything you typed in a
+  conversation, not only the first message. Every word must match, in any
+  order; title hits rank first, content hits show a snippet.
+- **`resume`** command and a smarter `/chat-namer:resume`: the command now
+  includes the directory (`cd <dir> && claude --resume <uuid>`), because
+  `claude --resume` only finds a session from where it started. Outside
+  Claude Code, `claude-chat-namer resume <query>` launches it directly.
+- **`recap`** command and `/chat-namer:recap` skill: pulls the last
+  exchanges of an earlier conversation into the current one, so you can
+  continue that work without resuming it.
+- **`--json`** output for `list`, `search`, `resume` and `recap`.
+- Respects `CLAUDE_CONFIG_DIR`.
+
+### Changed
+
+- Transcripts are streamed in 1 MB chunks instead of read whole, and the
+  metadata is cached in `~/.claude/chat-namer/cache.json`. Transcripts are
+  append-only, so a grown file is read only from where the last run stopped.
+  On 8 GB of transcripts (577 conversations) the first `list --all` takes
+  about 4 s; later runs about 0.3 s.
+
+## [1.0.1] - 2026-09-24
+
+Maintenance pass.
 
 ### Fixed
 

@@ -1,7 +1,8 @@
 {
   "name": "chat-namer",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Name, search, and resume your Claude Code conversations. No more UUID chaos.",
+  "icon": "./assets/icon.svg",
   "author": {
     "name": "Alex Mantello",
     "url": "https://github.com/Jamaalx"
