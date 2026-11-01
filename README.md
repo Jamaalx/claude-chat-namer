@@ -12,6 +12,23 @@ Claude Code stores conversations as UUID-named `.jsonl` files. This plugin names
 
 > Full features in Claude Code (terminal, desktop app, IDE). In Claude.ai and the other Claude apps it finds and recaps chats through Claude's past-chat search.
 
+## In numbers
+
+Small, but real: published in Anthropic's plugin directory on Oct 2, 2026, and used since.
+
+<p align="center"><img src="docs/stats.svg" alt="chat-namer in numbers: 412 installs from the Anthropic plugin directory, 51,610 loads with 0 errors, 13 active accounts in the last 28 days, 233 npm downloads" width="820"></p>
+
+<p align="center">
+  <a href="https://star-history.com/#Jamaalx/claude-chat-namer&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Jamaalx/claude-chat-namer&type=Date&theme=dark">
+      <img alt="Star history of Jamaalx/claude-chat-namer" src="https://api.star-history.com/svg?repos=Jamaalx/claude-chat-namer&type=Date" width="600">
+    </picture>
+  </a>
+</p>
+
+If it saves you some scrolling through UUIDs, a star helps others find it.
+
 ## Install
 
 ### As Claude Code Plugin (recommended)
